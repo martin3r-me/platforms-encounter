@@ -21,6 +21,9 @@ class EncounterServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/encounter.php', 'encounter');
+
+        // Verlauf-Registry: Fachmodule (encounter, occupational, später lab) liefern Akte-Einträge.
+        $this->app->singleton(\Platform\Encounter\Services\JournalRegistry::class);
     }
 
     public function boot(): void
@@ -40,7 +43,7 @@ class EncounterServiceProvider extends ServiceProvider
         ) {
             PlatformCore::registerModule([
                 'key'        => 'encounter',
-                'title'      => 'Termine',
+                'title'      => 'Akte',
                 'routing'    => config('encounter.routing'),
                 'guard'      => config('encounter.guard'),
                 'navigation' => config('encounter.navigation'),
@@ -67,6 +70,21 @@ class EncounterServiceProvider extends ServiceProvider
         $this->registerTools();
 
         $this->registerPatientPanel();
+
+        $this->registerJournalProvider();
+    }
+
+    /**
+     * Registriert den eigenen Verlauf-Provider (Termine → Akte-Einträge).
+     */
+    protected function registerJournalProvider(): void
+    {
+        try {
+            resolve(\Platform\Encounter\Services\JournalRegistry::class)
+                ->register(new \Platform\Encounter\Journal\EncounterJournalProvider());
+        } catch (\Throwable $e) {
+            // ignorieren
+        }
     }
 
     /**
