@@ -54,11 +54,27 @@ class Index extends Component
     {
         $team = Auth::user()->currentTeam;
 
-        $appointments = AppointmentModel::query()
+        $query = AppointmentModel::query()
             ->forTeam($team->id)
             ->with('patient')
-            ->orderByDesc('scheduled_at')
-            ->get();
+            ->orderByDesc('scheduled_at');
+
+        // Betrieb-Kontext (?node): auf die Patienten des Teilbaums filtern (guarded via customer).
+        $node = request()->query('node');
+        $contextLabel = null;
+        if ($node && class_exists(\Platform\Customer\Support\Companies::class)) {
+            $team_id = (int) $team->id;
+            $entityIds = \Platform\Customer\Support\Companies::subtreeIds((int) $node, $team_id);
+            $nodePatients = resolve(\Platform\Customer\Services\CompanyPatientRegistry::class)
+                ->patientsFor($entityIds, $team_id);
+            $patientIds = array_map(fn ($p) => $p['patient_id'], $nodePatients);
+            $query->whereIn('patient_id', $patientIds ?: [-1]);
+
+            $entity = \Platform\Organization\Models\OrganizationEntity::query()->whereKey($node)->first(['name']);
+            $contextLabel = $entity?->name;
+        }
+
+        $appointments = $query->get();
 
         $patients = PatientModel::query()
             ->forTeam($team->id)
@@ -67,6 +83,7 @@ class Index extends Component
 
         return view('encounter::livewire.appointment.index', [
             'appointments'   => $appointments,
+            'contextLabel'   => $contextLabel,
             'patientOptions' => $patients->map(fn ($p) => ['value' => $p->id, 'label' => $p->getDisplayName()])->values()->all(),
         ])->layout('platform::layouts.app');
     }

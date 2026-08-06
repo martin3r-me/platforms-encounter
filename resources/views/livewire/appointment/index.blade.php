@@ -20,10 +20,17 @@
     </x-slot>
 
     <x-ui-page-container width="contained" spacing="space-y-6">
+        @if($contextLabel)
+            <x-nx-callout variant="info" icon="heroicon-o-building-office-2" title="Kontext: {{ $contextLabel }}">
+                Termine der Beschäftigten dieses Betriebs (inkl. Abteilungen).
+                <a href="{{ route('encounter.appointments.index') }}" wire:navigate class="underline">Filter entfernen</a>
+            </x-nx-callout>
+        @endif
+
         @if($appointments->isEmpty())
             <x-nx-card>
                 <x-nx-empty icon="heroicon-o-calendar-days">
-                    Noch keine Termine. Lege den ersten über „Neuer Termin" an.
+                    @if($contextLabel) Keine Termine für diesen Betrieb. @else Noch keine Termine. Lege den ersten über „Neuer Termin" an. @endif
                 </x-nx-empty>
             </x-nx-card>
         @else

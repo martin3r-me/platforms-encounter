@@ -1,5 +1,5 @@
 {{--
-    Encounter · Sidebar (nx-Design-System). Nur var(--nx-*) Tokens.
+    Encounter · Haupt-Sidebar (nx). Modul-Links + Betrieb-Baum als Kontext-Linse.
 --}}
 
 <div>
@@ -7,43 +7,34 @@
         Termine
     </div>
 
-    <x-ui-sidebar-list label="Encounter">
-        <x-ui-sidebar-item :href="route('encounter.dashboard')">
-            @svg('heroicon-o-home', 'w-4 h-4 text-[var(--nx-text)]')
-            <span class="ml-2 text-sm">Dashboard</span>
-        </x-ui-sidebar-item>
-        <x-ui-sidebar-item :href="route('encounter.appointments.index')">
+    <x-ui-sidebar-list>
+        <x-ui-sidebar-item :href="route('encounter.dashboard')" :active="request()->routeIs('encounter.dashboard')">
             @svg('heroicon-o-calendar-days', 'w-4 h-4 text-[var(--nx-text)]')
-            <span class="ml-2 text-sm">Termine</span>
+            <span class="ml-2 text-sm">Kalender</span>
         </x-ui-sidebar-item>
-        <x-ui-sidebar-item :href="route('encounter.certificates.index')">
+        <x-ui-sidebar-item :href="route('encounter.appointments.index')" :active="request()->routeIs('encounter.appointments.index') && ! request()->query('node')">
+            @svg('heroicon-o-clock', 'w-4 h-4 text-[var(--nx-text)]')
+            <span class="ml-2 text-sm">Alle Termine</span>
+        </x-ui-sidebar-item>
+        <x-ui-sidebar-item :href="route('encounter.certificates.index')" :active="request()->routeIs('encounter.certificates.*')">
             @svg('heroicon-o-document-check', 'w-4 h-4 text-[var(--nx-text)]')
             <span class="ml-2 text-sm">Bescheinigungen</span>
         </x-ui-sidebar-item>
-        <x-ui-sidebar-item :href="route('encounter.settings')">
+        <x-ui-sidebar-item :href="route('encounter.settings')" :active="request()->routeIs('encounter.settings')">
             @svg('heroicon-o-cog-6-tooth', 'w-4 h-4 text-[var(--nx-text)]')
             <span class="ml-2 text-sm">Einstellungen</span>
         </x-ui-sidebar-item>
     </x-ui-sidebar-list>
 
-    @if($appointments->isNotEmpty())
-        <x-ui-sidebar-list label="Zuletzt">
-            @foreach($appointments as $appointment)
-                <x-ui-sidebar-item :href="route('encounter.appointments.show', $appointment->id)">
-                    @svg('heroicon-o-calendar', 'w-4 h-4 text-[var(--nx-text)]')
-                    <span class="ml-2 text-sm truncate">{{ $appointment->patient?->getDisplayName() ?? '—' }}</span>
-                </x-ui-sidebar-item>
-            @endforeach
-        </x-ui-sidebar-list>
-    @endif
+    <x-ui-tree-nav label="Nach Betrieb" :nodes="$nodes" :activeId="$activeId" />
 
     <div x-show="collapsed" class="px-2 py-2 border-b border-[color:var(--nx-line)]">
         <div class="flex flex-col gap-2">
             <a href="{{ route('encounter.dashboard') }}" wire:navigate class="flex items-center justify-center p-2 rounded-md text-[var(--nx-text)] hover:bg-[var(--nx-bg)]">
-                @svg('heroicon-o-home', 'w-5 h-5')
+                @svg('heroicon-o-calendar-days', 'w-5 h-5')
             </a>
             <a href="{{ route('encounter.appointments.index') }}" wire:navigate class="flex items-center justify-center p-2 rounded-md text-[var(--nx-text)] hover:bg-[var(--nx-bg)]">
-                @svg('heroicon-o-calendar-days', 'w-5 h-5')
+                @svg('heroicon-o-clock', 'w-5 h-5')
             </a>
         </div>
     </div>
