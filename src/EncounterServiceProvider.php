@@ -65,6 +65,21 @@ class EncounterServiceProvider extends ServiceProvider
         $this->registerLivewireComponents();
 
         $this->registerTools();
+
+        $this->registerPatientPanel();
+    }
+
+    /**
+     * Dockt das „Termine"-Panel an die Patienten-Akte an (wenn patient-Modul da ist).
+     */
+    protected function registerPatientPanel(): void
+    {
+        try {
+            resolve(\Platform\Patient\Services\PatientPanelRegistry::class)
+                ->register(new \Platform\Encounter\Patient\EncounterPatientPanel());
+        } catch (\Throwable $e) {
+            // patient-Modul nicht verfügbar — ignorieren.
+        }
     }
 
     protected function registerTools(): void
