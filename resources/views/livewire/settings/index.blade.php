@@ -169,11 +169,7 @@
         <x-slot name="header">{{ $editingId ? 'Textbaustein bearbeiten' : 'Neuer Textbaustein' }}</x-slot>
         <div class="space-y-4">
             <x-nx-input-text name="form.title" label="Titel" wire:model="form.title" required />
-            <x-nx-input-select name="form.audience" label="Zielgruppe" wire:model="form.audience">
-                @foreach($audienceOptions as $audience)
-                    <option value="{{ $audience->value }}">{{ $audience->label() }}</option>
-                @endforeach
-            </x-nx-input-select>
+            <x-nx-input-select name="form.audience" label="Zielgruppe" wire:model="form.audience" :options="$audienceOptions" />
             <x-nx-input-textarea name="form.content" label="Inhalt" wire:model="form.content" rows="5" />
             <div class="grid grid-cols-2 gap-4">
                 <x-nx-input-number name="form.position" label="Position" wire:model="form.position" />
@@ -197,16 +193,8 @@
                 <x-nx-input-text name="fieldForm.key" label="Key" wire:model="fieldForm.key" required />
             </div>
             <div class="grid grid-cols-2 gap-4">
-                <x-nx-input-select name="fieldForm.type" label="Typ" wire:model="fieldForm.type">
-                    @foreach($typeOptions as $type)
-                        <option value="{{ $type->value }}">{{ $type->label() }}</option>
-                    @endforeach
-                </x-nx-input-select>
-                <x-nx-input-select name="fieldForm.audience" label="Zielgruppe" wire:model="fieldForm.audience">
-                    @foreach($audienceOptions as $audience)
-                        <option value="{{ $audience->value }}">{{ $audience->label() }}</option>
-                    @endforeach
-                </x-nx-input-select>
+                <x-nx-input-select name="fieldForm.type" label="Typ" wire:model="fieldForm.type" :options="$typeOptions" />
+                <x-nx-input-select name="fieldForm.audience" label="Zielgruppe" wire:model="fieldForm.audience" :options="$audienceOptions" />
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <x-nx-input-number name="fieldForm.position" label="Position" wire:model="fieldForm.position" />

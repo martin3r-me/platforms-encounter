@@ -152,11 +152,7 @@
     <x-nx-modal wire:model="showDeliveryModal" size="md">
         <x-slot name="header">Zustellung erfassen</x-slot>
         <div class="space-y-4">
-            <x-nx-input-select name="deliveryForm.channel" label="Kanal" wire:model="deliveryForm.channel">
-                @foreach($channelOptions as $channel)
-                    <option value="{{ $channel->value }}">{{ $channel->label() }}</option>
-                @endforeach
-            </x-nx-input-select>
+            <x-nx-input-select name="deliveryForm.channel" label="Kanal" wire:model="deliveryForm.channel" :options="$channelOptions" />
             <x-nx-input-text name="deliveryForm.recipient" label="Empfänger" wire:model="deliveryForm.recipient" />
             <x-nx-input-date name="deliveryForm.sent_at" label="Versendet am" wire:model="deliveryForm.sent_at" />
         </div>

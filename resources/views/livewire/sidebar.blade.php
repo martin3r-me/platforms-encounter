@@ -20,6 +20,10 @@
             @svg('heroicon-o-document-check', 'w-4 h-4 text-[var(--nx-text)]')
             <span class="ml-2 text-sm">Bescheinigungen</span>
         </x-ui-sidebar-item>
+        <x-ui-sidebar-item :href="route('encounter.settings')">
+            @svg('heroicon-o-cog-6-tooth', 'w-4 h-4 text-[var(--nx-text)]')
+            <span class="ml-2 text-sm">Einstellungen</span>
+        </x-ui-sidebar-item>
     </x-ui-sidebar-list>
 
     @if($appointments->isNotEmpty())

@@ -30,11 +30,7 @@
             <x-nx-card>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <x-nx-input-datetime name="form.scheduled_at" label="Termin" wire:model="form.scheduled_at" />
-                    <x-nx-input-select name="form.status" label="Status" wire:model="form.status">
-                        @foreach($statusOptions as $status)
-                            <option value="{{ $status->value }}">{{ $status->label() }}</option>
-                        @endforeach
-                    </x-nx-input-select>
+                    <x-nx-input-select name="form.status" label="Status" wire:model="form.status" :options="$statusOptions" />
                     <x-nx-input-text name="form.performed_by" label="Durchgeführt von" wire:model="form.performed_by" />
                     <x-nx-input-text name="form.doctor_stamp" label="Arztstempel" wire:model="form.doctor_stamp" />
                 </div>
@@ -188,11 +184,7 @@
     <x-nx-modal wire:model="showCertModal" size="md">
         <x-slot name="header">Bescheinigung ausstellen</x-slot>
         <div class="space-y-4">
-            <x-nx-input-select name="certAudience" label="Zielgruppe" wire:model="certAudience">
-                @foreach($audienceOptions as $audience)
-                    <option value="{{ $audience->value }}">{{ $audience->label() }}</option>
-                @endforeach
-            </x-nx-input-select>
+            <x-nx-input-select name="certAudience" label="Zielgruppe" wire:model="certAudience" :options="$audienceOptions" />
             <x-nx-callout variant="info" icon="heroicon-o-lock-closed" title="Schweigepflicht">
                 Für die Zielgruppe „Arbeitgeber" werden medizinische Ergebnisse automatisch ausgelassen.
                 Der Inhalt wird zum Ausstellungszeitpunkt eingefroren.

@@ -179,8 +179,8 @@ class Index extends Component
         return view('encounter::livewire.settings.index', [
             'blocks'          => TextBlockModel::query()->forTeam($team)->orderBy('audience')->orderBy('position')->get(),
             'fields'          => FieldDefinitionModel::query()->forTeam($team)->orderBy('position')->get(),
-            'audienceOptions' => Audience::cases(),
-            'typeOptions'     => FieldType::cases(),
+            'audienceOptions' => collect(Audience::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
+            'typeOptions'     => collect(FieldType::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
         ])->layout('platform::layouts.app');
     }
 }

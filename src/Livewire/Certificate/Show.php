@@ -75,7 +75,7 @@ class Show extends Component
 
         return view('encounter::livewire.certificate.show', [
             'certificate'    => $certificate,
-            'channelOptions' => DeliveryChannel::cases(),
+            'channelOptions' => collect(DeliveryChannel::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
         ])->layout('platform::layouts.app');
     }
 }

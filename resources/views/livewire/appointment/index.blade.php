@@ -77,12 +77,8 @@
     <x-nx-modal wire:model="showCreate" size="md">
         <x-slot name="header">Neuer Termin</x-slot>
         <div class="space-y-4">
-            <x-nx-input-select name="patient_id" label="Patient" wire:model="patient_id" required>
-                <option value="">— Patient wählen —</option>
-                @foreach($patients as $patient)
-                    <option value="{{ $patient->id }}">{{ $patient->getDisplayName() }}</option>
-                @endforeach
-            </x-nx-input-select>
+            <x-nx-input-select name="patient_id" label="Patient" wire:model="patient_id"
+                               :options="$patientOptions" nullable nullLabel="— Patient wählen —" required />
             <x-nx-input-datetime name="scheduled_at" label="Termin" wire:model="scheduled_at" required />
         </div>
         <x-slot name="footer">

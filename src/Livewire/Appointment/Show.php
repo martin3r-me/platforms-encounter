@@ -152,8 +152,8 @@ class Show extends Component
 
         return view('encounter::livewire.appointment.show', [
             'appointment'     => $model,
-            'statusOptions'   => AppointmentStatus::cases(),
-            'audienceOptions' => Audience::cases(),
+            'statusOptions'   => collect(AppointmentStatus::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
+            'audienceOptions' => collect(Audience::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
         ])->layout('platform::layouts.app');
     }
 }
