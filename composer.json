@@ -1,0 +1,21 @@
+{
+    "name": "martin3r/platform-encounter",
+    "description": "Encounter - klinischer Kern: Termin, Leistung, Bescheinigung, Recall (fachneutral)",
+    "type": "library",
+    "license": "MIT",
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "Platform\\Encounter\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Platform\\Encounter\\EncounterServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
