@@ -67,7 +67,7 @@ class Index extends Component
 
         return view('encounter::livewire.appointment.index', [
             'appointments'   => $appointments,
-            'patientOptions' => $patients->mapWithKeys(fn ($p) => [$p->id => $p->getDisplayName()])->all(),
+            'patientOptions' => $patients->map(fn ($p) => ['value' => $p->id, 'label' => $p->getDisplayName()])->values()->all(),
         ])->layout('platform::layouts.app');
     }
 }
