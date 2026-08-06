@@ -43,9 +43,16 @@ class Show extends Component
             fn ($e) => ($e['type'] ?? null) === 'provision' && !empty($e['badge'])
         ));
 
+        // Nach Tag gruppieren (Reihenfolge = neueste zuerst, wie $entries).
+        $grouped = [];
+        foreach ($entries as $e) {
+            $grouped[$e['date']->format('Y-m-d')][] = $e;
+        }
+
         return view('encounter::livewire.record.show', [
             'patient'       => $patient,
             'entries'       => $entries,
+            'grouped'       => $grouped,
             'dueProvisions' => $dueProvisions,
         ])->layout('platform::layouts.app');
     }
