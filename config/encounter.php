@@ -43,6 +43,11 @@ return [
                     'route' => 'encounter.certificates.index',
                     'icon'  => 'heroicon-o-document-check',
                 ],
+                [
+                    'label' => 'Einstellungen',
+                    'route' => 'encounter.settings',
+                    'icon'  => 'heroicon-o-cog-6-tooth',
+                ],
             ],
         ],
     ],

@@ -77,6 +77,22 @@ class EncounterServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Encounter\Tools\CreateAppointmentTool());
             $registry->register(new \Platform\Encounter\Tools\UpdateAppointmentTool());
             $registry->register(new \Platform\Encounter\Tools\DeleteAppointmentTool());
+
+            // Settings: Textbausteine
+            $registry->register(new \Platform\Encounter\Tools\ListTextBlocksTool());
+            $registry->register(new \Platform\Encounter\Tools\CreateTextBlockTool());
+            $registry->register(new \Platform\Encounter\Tools\UpdateTextBlockTool());
+            $registry->register(new \Platform\Encounter\Tools\DeleteTextBlockTool());
+
+            // Settings: Feld-Definitionen
+            $registry->register(new \Platform\Encounter\Tools\ListFieldDefinitionsTool());
+            $registry->register(new \Platform\Encounter\Tools\CreateFieldDefinitionTool());
+            $registry->register(new \Platform\Encounter\Tools\UpdateFieldDefinitionTool());
+            $registry->register(new \Platform\Encounter\Tools\DeleteFieldDefinitionTool());
+
+            // Settings: Praxis-Profil
+            $registry->register(new \Platform\Encounter\Tools\GetPracticeTool());
+            $registry->register(new \Platform\Encounter\Tools\UpdatePracticeTool());
         } catch (\Throwable $e) {
             // ToolRegistry nicht verfügbar — ignorieren.
         }
