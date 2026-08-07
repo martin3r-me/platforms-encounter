@@ -12,13 +12,10 @@
             @svg('heroicon-o-rectangle-group', 'w-4 h-4 text-[var(--nx-text)]')
             <span class="ml-2 text-sm">Sprechstunde</span>
         </x-ui-sidebar-item>
-        <x-ui-sidebar-item :href="route('encounter.dashboard')" :active="request()->routeIs('encounter.dashboard')">
+        <x-ui-sidebar-item :href="route('encounter.appointments.index')"
+            :active="(request()->routeIs('encounter.appointments.index') || request()->routeIs('encounter.dashboard')) && ! request()->query('node')">
             @svg('heroicon-o-calendar-days', 'w-4 h-4 text-[var(--nx-text)]')
-            <span class="ml-2 text-sm">Kalender</span>
-        </x-ui-sidebar-item>
-        <x-ui-sidebar-item :href="route('encounter.appointments.index')" :active="request()->routeIs('encounter.appointments.index') && ! request()->query('node')">
-            @svg('heroicon-o-clock', 'w-4 h-4 text-[var(--nx-text)]')
-            <span class="ml-2 text-sm">Alle Termine</span>
+            <span class="ml-2 text-sm">Termine</span>
         </x-ui-sidebar-item>
         <x-ui-sidebar-item :href="route('encounter.certificates.index')" :active="request()->routeIs('encounter.certificates.*')">
             @svg('heroicon-o-document-check', 'w-4 h-4 text-[var(--nx-text)]')

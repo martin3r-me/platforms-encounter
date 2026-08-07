@@ -15,6 +15,7 @@
             ['label' => 'Termine', 'route' => 'encounter.dashboard', 'icon' => 'calendar-days'],
             ['label' => 'Kalender'],
         ]">
+            @include('encounter::partials.termine-toggle')
             <div class="flex items-center gap-1">
                 <x-nx-button variant="ghost" size="sm" wire:click="goPrev">@svg('heroicon-o-chevron-left', 'w-4 h-4')</x-nx-button>
                 <x-nx-button variant="secondary" size="sm" wire:click="goToday">Heute</x-nx-button>

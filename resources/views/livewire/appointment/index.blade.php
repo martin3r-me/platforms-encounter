@@ -12,6 +12,7 @@
             ['label' => 'Termine', 'route' => 'encounter.dashboard', 'icon' => 'calendar-days'],
             ['label' => 'Liste'],
         ]">
+            @include('encounter::partials.termine-toggle')
             <x-nx-button variant="primary" size="sm" wire:click="$set('showCreate', true)">
                 @svg('heroicon-o-plus', 'w-4 h-4')
                 <span>Neuer Termin</span>
