@@ -47,6 +47,7 @@ class EncounterServiceProvider extends ServiceProvider
             PlatformCore::registerModule([
                 'key'        => 'encounter',
                 'title'      => 'Sprechstunde',
+                'group'      => 'clinical',
                 'routing'    => config('encounter.routing'),
                 'guard'      => config('encounter.guard'),
                 'navigation' => config('encounter.navigation'),
