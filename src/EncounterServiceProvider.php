@@ -37,6 +37,7 @@ class EncounterServiceProvider extends ServiceProvider
             'encounter_service'     => Service::class,
             'encounter_certificate' => Certificate::class,
             'encounter_text_block'  => TextBlock::class,
+            'encounter_anamnesis_question' => \Platform\Encounter\Models\AnamnesisQuestion::class,
         ]);
 
         if (

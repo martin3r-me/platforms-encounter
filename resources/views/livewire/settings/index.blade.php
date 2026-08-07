@@ -119,6 +119,58 @@
             @endif
         </x-nx-section>
 
+        {{-- Anamnese-Fragenkatalog --}}
+        <x-nx-section icon="heroicon-o-clipboard-document-list" title="Anamnese-Fragenkatalog"
+                      description="Anlassabhängige Anamnese-Fragen (an ArbMedVV-Vorsorgeanlass gebunden) + untersucherabhängig."
+                      :hint="$questions->count()">
+            <x-slot name="action">
+                <x-nx-button variant="secondary" size="sm" wire:click="openQuestionCreate">
+                    @svg('heroicon-o-plus', 'w-4 h-4') Neue Frage
+                </x-nx-button>
+            </x-slot>
+            @if($questions->isEmpty())
+                <x-nx-card>
+                    <x-nx-empty icon="heroicon-o-clipboard-document-list">Noch keine Fragen. Lege die erste über „Neue Frage" an.</x-nx-empty>
+                </x-nx-card>
+            @else
+                <x-nx-card flush>
+                    <x-nx-table>
+                        <x-nx-table-header>
+                            <x-nx-table-header-cell>Frage</x-nx-table-header-cell>
+                            <x-nx-table-header-cell>Anlass</x-nx-table-header-cell>
+                            <x-nx-table-header-cell>Typ</x-nx-table-header-cell>
+                            <x-nx-table-header-cell>Untersucher</x-nx-table-header-cell>
+                            <x-nx-table-header-cell align="right"></x-nx-table-header-cell>
+                        </x-nx-table-header>
+                        <x-nx-table-body>
+                            @foreach($questions as $q)
+                                <x-nx-table-row wire:key="aq-{{ $q->id }}">
+                                    <x-nx-table-cell>
+                                        {{ $q->text }}
+                                        @if($q->section)<span class="ml-1 text-xs text-[color:var(--nx-faint)]">· {{ $q->section }}</span>@endif
+                                    </x-nx-table-cell>
+                                    <x-nx-table-cell class="text-[color:var(--nx-muted)]">{{ $q->catalog?->title ?? 'allgemein' }}</x-nx-table-cell>
+                                    <x-nx-table-cell><x-nx-badge>{{ $q->type?->label() }}</x-nx-badge></x-nx-table-cell>
+                                    <x-nx-table-cell class="text-[color:var(--nx-muted)]">{{ $q->examiner_scope ?: 'alle' }}</x-nx-table-cell>
+                                    <x-nx-table-cell align="right">
+                                        <div class="flex justify-end gap-2">
+                                            <x-nx-button variant="ghost" size="xs" wire:click="openQuestionEdit({{ $q->id }})">
+                                                @svg('heroicon-o-pencil-square', 'w-4 h-4')
+                                            </x-nx-button>
+                                            <x-nx-button variant="danger" size="xs" wire:click="deleteQuestion({{ $q->id }})"
+                                                         wire:confirm="Frage löschen?">
+                                                @svg('heroicon-o-trash', 'w-4 h-4')
+                                            </x-nx-button>
+                                        </div>
+                                    </x-nx-table-cell>
+                                </x-nx-table-row>
+                            @endforeach
+                        </x-nx-table-body>
+                    </x-nx-table>
+                </x-nx-card>
+            @endif
+        </x-nx-section>
+
         {{-- Praxis-Profil --}}
         <x-nx-section icon="heroicon-o-building-storefront" title="Praxis-Profil"
                       description="Briefkopf für Bescheinigungen/PDF (ein Datensatz je Team).">
@@ -206,6 +258,28 @@
                 <x-nx-button variant="ghost" wire:click="$set('showFieldModal', false)">Abbrechen</x-nx-button>
                 <x-nx-button variant="primary" wire:click="saveField">Speichern</x-nx-button>
             </div>
+        </x-slot>
+    </x-nx-modal>
+
+    {{-- Anamnese-Frage anlegen/bearbeiten --}}
+    <x-nx-modal wire:model="showQuestionModal" size="lg">
+        <x-slot name="header">{{ $editingQuestionId ? 'Frage bearbeiten' : 'Neue Anamnese-Frage' }}</x-slot>
+        <div class="space-y-3">
+            <x-nx-input-textarea name="questionForm.text" label="Frage" wire:model="questionForm.text" rows="2" />
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <x-nx-input-select name="questionForm.type" label="Antworttyp" wire:model="questionForm.type" :options="$questionTypeOptions" />
+                <x-nx-input-select name="questionForm.occasion_id" label="Vorsorgeanlass (ArbMedVV)" wire:model="questionForm.occasion_id" :options="$occasionOptions" />
+                <x-nx-input-text name="questionForm.examiner_scope" label="Untersucher (leer = alle)" wire:model="questionForm.examiner_scope" placeholder="z.B. arzt / assistenz" />
+                <x-nx-input-text name="questionForm.section" label="Abschnitt (Gruppierung)" wire:model="questionForm.section" placeholder="z.B. Vorerkrankungen" />
+                <x-nx-input-text name="questionForm.position" type="number" label="Position" wire:model="questionForm.position" />
+                <label class="inline-flex items-center gap-2 text-sm text-[color:var(--nx-text)] mt-6">
+                    <input type="checkbox" wire:model="questionForm.active" class="rounded border-[color:var(--nx-line)]" /> Aktiv
+                </label>
+            </div>
+        </div>
+        <x-slot name="footer">
+            <x-nx-button variant="ghost" wire:click="$set('showQuestionModal', false)">Abbrechen</x-nx-button>
+            <x-nx-button variant="primary" wire:click="saveQuestion">Speichern</x-nx-button>
         </x-slot>
     </x-nx-modal>
 </x-ui-page>

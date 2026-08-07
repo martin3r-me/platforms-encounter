@@ -7,8 +7,10 @@ use Illuminate\Support\Facades\Auth;
 use Platform\Encounter\Models\TextBlock as TextBlockModel;
 use Platform\Encounter\Models\FieldDefinition as FieldDefinitionModel;
 use Platform\Encounter\Models\Practice as PracticeModel;
+use Platform\Encounter\Models\AnamnesisQuestion as AnamnesisQuestionModel;
 use Platform\Encounter\Enums\Audience;
 use Platform\Encounter\Enums\FieldType;
+use Platform\Encounter\Enums\QuestionType;
 
 class Index extends Component
 {
@@ -21,6 +23,11 @@ class Index extends Component
     public bool $showFieldModal = false;
     public ?int $editingFieldId = null;
     public array $fieldForm = ['key' => '', 'label' => '', 'type' => 'text', 'audience' => 'internal', 'position' => 0, 'active' => true];
+
+    // --- Anamnese-Fragenkatalog ---
+    public bool $showQuestionModal = false;
+    public ?int $editingQuestionId = null;
+    public array $questionForm = ['text' => '', 'type' => 'yes_no', 'occasion_id' => '', 'examiner_scope' => '', 'section' => '', 'position' => 0, 'active' => true];
 
     // --- Praxis-Profil ---
     public array $practiceForm = [
@@ -156,6 +163,79 @@ class Index extends Component
         FieldDefinitionModel::query()->forTeam($this->teamId())->findOrFail($id)->delete();
     }
 
+    // ===== Anamnese-Fragenkatalog =====
+
+    public function openQuestionCreate(): void
+    {
+        $this->questionForm = ['text' => '', 'type' => 'yes_no', 'occasion_id' => '', 'examiner_scope' => '', 'section' => '', 'position' => 0, 'active' => true];
+        $this->editingQuestionId = null;
+        $this->showQuestionModal = true;
+    }
+
+    public function openQuestionEdit(int $id): void
+    {
+        $q = AnamnesisQuestionModel::query()->forTeam($this->teamId())->findOrFail($id);
+        $this->editingQuestionId = $q->id;
+        $this->questionForm = [
+            'text'           => $q->text,
+            'type'           => $q->type?->value ?? 'yes_no',
+            'occasion_id'    => $q->catalog_type === 'arbmedvv_occasion' ? (string) $q->catalog_id : '',
+            'examiner_scope' => $q->examiner_scope ?? '',
+            'section'        => $q->section ?? '',
+            'position'       => (int) $q->position,
+            'active'         => (bool) $q->active,
+        ];
+        $this->showQuestionModal = true;
+    }
+
+    public function saveQuestion(): void
+    {
+        $data = $this->validate([
+            'questionForm.text'           => ['required', 'string', 'max:1000'],
+            'questionForm.type'           => ['required', 'string', 'in:yes_no,text,scale,choice'],
+            'questionForm.occasion_id'    => ['nullable', 'string', 'max:255'],
+            'questionForm.examiner_scope' => ['nullable', 'string', 'max:24'],
+            'questionForm.section'        => ['nullable', 'string', 'max:191'],
+            'questionForm.position'       => ['nullable', 'integer'],
+        ])['questionForm'];
+
+        // occasion_id kann ID ODER Titel sein (Select-Rendering) → zur ID auflösen.
+        $occasionId = $data['occasion_id'] ?: null;
+        if ($occasionId !== null && !ctype_digit((string) $occasionId)
+            && class_exists(\Platform\Arbmedvv\Models\Occasion::class)) {
+            $occasionId = \Platform\Arbmedvv\Models\Occasion::query()
+                ->where('team_id', $this->teamId())->where('title', $occasionId)->value('id');
+        }
+        $occasionId = $occasionId ? (int) $occasionId : null;
+
+        $payload = [
+            'team_id'            => $this->teamId(),
+            'text'               => $data['text'],
+            'type'               => $data['type'],
+            'catalog_type'       => $occasionId ? 'arbmedvv_occasion' : null,
+            'catalog_id'         => $occasionId,
+            'examiner_scope'     => $data['examiner_scope'] ?: null,
+            'section'            => $data['section'] ?: null,
+            'position'           => (int) ($data['position'] ?? 0),
+            'active'             => (bool) ($this->questionForm['active'] ?? true),
+            'created_by_user_id' => Auth::id(),
+        ];
+
+        if ($this->editingQuestionId) {
+            AnamnesisQuestionModel::query()->forTeam($this->teamId())->findOrFail($this->editingQuestionId)->update($payload);
+        } else {
+            AnamnesisQuestionModel::create($payload);
+        }
+
+        $this->showQuestionModal = false;
+        $this->dispatch('toast', message: 'Frage gespeichert.', type: 'success');
+    }
+
+    public function deleteQuestion(int $id): void
+    {
+        AnamnesisQuestionModel::query()->forTeam($this->teamId())->findOrFail($id)->delete();
+    }
+
     // ===== Praxis-Profil =====
 
     public function savePractice(): void
@@ -176,11 +256,22 @@ class Index extends Component
     {
         $team = $this->teamId();
 
+        // Anlass-Katalog (arbmedvv) guarded.
+        $occasionOptions = ['' => '— allgemein (kein Anlass) —'];
+        if (class_exists(\Platform\Arbmedvv\Models\Occasion::class)) {
+            foreach (\Platform\Arbmedvv\Models\Occasion::query()->where('team_id', $team)->orderBy('title')->get() as $o) {
+                $occasionOptions[$o->id] = $o->title;
+            }
+        }
+
         return view('encounter::livewire.settings.index', [
             'blocks'          => TextBlockModel::query()->forTeam($team)->orderBy('audience')->orderBy('position')->get(),
             'fields'          => FieldDefinitionModel::query()->forTeam($team)->orderBy('position')->get(),
+            'questions'       => AnamnesisQuestionModel::query()->forTeam($team)->with('catalog')->orderBy('section')->orderBy('position')->get(),
             'audienceOptions' => collect(Audience::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
             'typeOptions'     => collect(FieldType::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
+            'questionTypeOptions' => QuestionType::options(),
+            'occasionOptions'     => $occasionOptions,
         ])->layout('platform::layouts.app');
     }
 }
