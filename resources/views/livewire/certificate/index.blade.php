@@ -38,7 +38,7 @@
                     </x-nx-table-header>
                     <x-nx-table-body>
                         @foreach($certificates as $certificate)
-                            <x-nx-table-row wire:key="cert-{{ $certificate->id }}"
+                            <x-nx-table-row wire:key="cert-{{ $certificate->id }}" clickable
                                             :href="route('encounter.certificates.show', $certificate->id)">
                                 <x-nx-table-cell>{{ $certificate->title }}</x-nx-table-cell>
                                 <x-nx-table-cell>{{ $certificate->patient?->getDisplayName() ?? '—' }}</x-nx-table-cell>
