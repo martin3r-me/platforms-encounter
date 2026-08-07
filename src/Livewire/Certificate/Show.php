@@ -73,8 +73,17 @@ class Show extends Component
     {
         $certificate = $this->resolve($this->certificateId)->load(['deliveries', 'patient']);
 
+        $letterhead = null;
+        try {
+            $letterhead = resolve(\Platform\Encounter\Services\LetterheadRegistry::class)
+                ->letterheadFor((int) $certificate->team_id, ['certificate_id' => $certificate->id]);
+        } catch (\Throwable $e) {
+            // Briefkopf ist optional — Dokument bleibt gültig.
+        }
+
         return view('encounter::livewire.certificate.show', [
             'certificate'    => $certificate,
+            'letterhead'     => $letterhead,
             'channelOptions' => collect(DeliveryChannel::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
         ])->layout('platform::layouts.app');
     }

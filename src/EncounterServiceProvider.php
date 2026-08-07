@@ -24,6 +24,9 @@ class EncounterServiceProvider extends ServiceProvider
 
         // Verlauf-Registry: Fachmodule (encounter, occupational, später lab) liefern Akte-Einträge.
         $this->app->singleton(\Platform\Encounter\Services\JournalRegistry::class);
+
+        // Briefkopf-Registry: practice-Modul (Standort + Arzt) liefert, encounter-Fallback als Basis.
+        $this->app->singleton(\Platform\Encounter\Services\LetterheadRegistry::class);
     }
 
     public function boot(): void
@@ -72,6 +75,21 @@ class EncounterServiceProvider extends ServiceProvider
         $this->registerPatientPanel();
 
         $this->registerJournalProvider();
+
+        $this->registerLetterheadProvider();
+    }
+
+    /**
+     * Registriert den encounter-internen Briefkopf-Fallback (Priorität 0).
+     */
+    protected function registerLetterheadProvider(): void
+    {
+        try {
+            resolve(\Platform\Encounter\Services\LetterheadRegistry::class)
+                ->register(new \Platform\Encounter\Letterhead\EncounterPracticeLetterheadProvider());
+        } catch (\Throwable $e) {
+            // ignorieren
+        }
     }
 
     /**

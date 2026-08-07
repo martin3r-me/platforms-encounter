@@ -34,6 +34,52 @@
             </x-nx-callout>
         @endif
 
+        {{-- Briefkopf (aus practice-Modul: Standort + Arzt; sonst encounter-Fallback) --}}
+        @if($letterhead)
+            <x-nx-card>
+                <div class="flex items-start justify-between gap-4">
+                    <div class="min-w-0">
+                        <div class="text-base font-semibold text-[color:var(--nx-text)]">{{ $letterhead['name'] ?? 'Praxis' }}</div>
+                        @foreach(($letterhead['address_lines'] ?? []) as $line)
+                            <div class="text-sm text-[color:var(--nx-muted)]">{{ $line }}</div>
+                        @endforeach
+                        @if(!empty($letterhead['contact_lines']))
+                            <div class="mt-1 text-xs text-[color:var(--nx-faint)]">{{ implode(' · ', $letterhead['contact_lines']) }}</div>
+                        @endif
+                        @if(!empty($letterhead['bsnr']))
+                            <div class="mt-1 text-xs text-[color:var(--nx-faint)]">BSNR {{ $letterhead['bsnr'] }}</div>
+                        @endif
+                    </div>
+                    @if(!empty($letterhead['logo_url']))
+                        <img src="{{ $letterhead['logo_url'] }}" alt="Logo" class="h-14 max-w-[160px] object-contain shrink-0" />
+                    @endif
+                </div>
+
+                @if(!empty($letterhead['doctor']))
+                    @php($doc = $letterhead['doctor'])
+                    <div class="mt-4 pt-4 border-t border-[color:var(--nx-line)] flex items-end justify-between gap-4">
+                        <div class="text-sm">
+                            <div class="text-[color:var(--nx-text)]">{{ trim(($doc['title'] ?? '') . ' ' . ($doc['name'] ?? '')) ?: 'Ausstellender Arzt' }}</div>
+                            @if(!empty($doc['specialty']))
+                                <div class="text-[color:var(--nx-muted)]">{{ $doc['specialty'] }}</div>
+                            @endif
+                            @if(!empty($doc['lanr']))
+                                <div class="text-xs text-[color:var(--nx-faint)]">LANR {{ $doc['lanr'] }}</div>
+                            @endif
+                        </div>
+                        <div class="flex items-end gap-4 shrink-0">
+                            @if(!empty($doc['signature_url']))
+                                <img src="{{ $doc['signature_url'] }}" alt="Unterschrift" class="h-12 max-w-[160px] object-contain" />
+                            @endif
+                            @if(!empty($letterhead['stamp_url']))
+                                <img src="{{ $letterhead['stamp_url'] }}" alt="Stempel" class="h-16 max-w-[120px] object-contain" />
+                            @endif
+                        </div>
+                    </div>
+                @endif
+            </x-nx-card>
+        @endif
+
         {{-- Kopf --}}
         <x-nx-section icon="heroicon-o-document-check" title="Bescheinigung">
             <x-nx-card>
