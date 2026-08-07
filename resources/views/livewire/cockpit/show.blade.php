@@ -284,7 +284,7 @@
 
     {{-- Rechte Sidebar: Werte & Status --}}
     <x-slot name="activity">
-        <x-ui-page-sidebar title="Werte &amp; Status" width="w-80" :defaultOpen="true" storeKey="activityOpen" side="right">
+        <x-ui-page-sidebar title="Werte & Status" width="w-80" :defaultOpen="true" storeKey="activityOpen" side="right">
             <div class="p-4 space-y-6">
                 @if($patient)
                     <div>

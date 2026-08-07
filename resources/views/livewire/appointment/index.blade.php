@@ -44,6 +44,7 @@
                     <x-nx-table-body>
                         @foreach($appointments as $appointment)
                             <x-nx-table-row wire:key="appt-{{ $appointment->id }}"
+                                            clickable
                                             :href="route('encounter.appointments.show', $appointment->id)">
                                 <x-nx-table-cell>{{ $appointment->patient?->getDisplayName() ?? '—' }}</x-nx-table-cell>
                                 <x-nx-table-cell>{{ optional($appointment->scheduled_at)->format('d.m.Y H:i') }}</x-nx-table-cell>

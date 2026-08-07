@@ -129,7 +129,7 @@
         </x-nx-section>
 
         {{-- Klinischer Freitext (verschlüsselt) --}}
-        <x-nx-section icon="heroicon-o-lock-closed" title="Befund &amp; Notizen (Freitext)"
+        <x-nx-section icon="heroicon-o-lock-closed" title="Befund & Notizen (Freitext)"
                       description="Verschlüsselt gespeichert (Schweigepflicht).">
             <x-nx-card>
                 <div class="space-y-4">
