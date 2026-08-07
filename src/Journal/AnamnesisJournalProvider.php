@@ -6,6 +6,7 @@ use Illuminate\Support\Str;
 use Platform\Encounter\Contracts\JournalEntryProvider;
 use Platform\Encounter\Models\Anamnesis;
 use Platform\Encounter\Models\AnamnesisQuestion;
+use Platform\Encounter\Services\AnamnesisHistory;
 
 /**
  * Liefert die erfassten Anamnesen (Stufe B) eines Patienten als Verlauf-Einträge —
@@ -31,6 +32,9 @@ class AnamnesisJournalProvider implements JournalEntryProvider
         $questionText = AnamnesisQuestion::query()->forTeam($teamId)
             ->pluck('text', 'id')->all();
 
+        // Delta-Historie (Stufe C): pro Anamnese die geänderten/neuen Antworten.
+        $changes = AnamnesisHistory::forPatient($patientId, $teamId)['changes'] ?? [];
+
         // Anlass-Titel (arbmedvv) guarded auflösen.
         $occasionTitle = [];
         if (class_exists(\Platform\Arbmedvv\Models\Occasion::class)) {
@@ -42,10 +46,28 @@ class AnamnesisJournalProvider implements JournalEntryProvider
         foreach ($anamneses as $a) {
             $answers = $a->answers ?? [];
 
+            $delta = $changes[$a->id] ?? [];
+            $changedCount = 0;
+
             $lines = [];
             foreach ($answers as $qid => $val) {
-                $label = $questionText[(int) $qid] ?? ('Frage #' . $qid);
-                $lines[] = Str::limit($label, 80) . ': ' . (is_scalar($val) ? (string) $val : json_encode($val));
+                $qid   = (int) $qid;
+                $label = $questionText[$qid] ?? ('Frage #' . $qid);
+                $value = is_scalar($val) ? (string) $val : json_encode($val);
+
+                // Delta-Marker: neu / geändert ggü. letztem Kontakt.
+                $marker = '';
+                if (isset($delta[$qid])) {
+                    $changedCount++;
+                    if (!empty($delta[$qid]['new'])) {
+                        $marker = ' (neu)';
+                    } else {
+                        $from = $delta[$qid]['from'];
+                        $marker = ' (vorher: ' . (is_scalar($from) ? (string) $from : json_encode($from)) . ')';
+                    }
+                }
+
+                $lines[] = Str::limit($label, 80) . ': ' . $value . $marker;
                 if (count($lines) >= 6) {
                     $lines[] = '…';
                     break;
@@ -62,6 +84,12 @@ class AnamnesisJournalProvider implements JournalEntryProvider
                 ? ($occasionTitle[(int) $a->catalog_id] ?? null)
                 : null;
 
+            // Änderungs-Badge dominiert (Stufe C): „N geändert" statt Anlass, wenn Deltas da sind.
+            $badge = $occTitle ? ['label' => $occTitle, 'variant' => 'default'] : null;
+            if ($changedCount > 0) {
+                $badge = ['label' => $changedCount . ' geändert', 'variant' => 'warning'];
+            }
+
             $entries[] = [
                 'date'     => $a->appointment?->scheduled_at ?? $a->created_at,
                 'anchor'   => 'anamnesis-' . $a->id,
@@ -69,9 +97,9 @@ class AnamnesisJournalProvider implements JournalEntryProvider
                 'icon'     => 'heroicon-o-clipboard-document-list',
                 'title'    => 'Anamnese',
                 'subtitle' => $occTitle ? ('Anlass: ' . $occTitle) : 'ohne Anlass',
-                'badge'    => $occTitle ? ['label' => $occTitle, 'variant' => 'default'] : null,
+                'badge'    => $badge,
                 'lines'    => $lines,
-                'url'      => $a->appointment_id ? route('encounter.appointments.show', $a->appointment_id) : null,
+                'url'      => route('encounter.anamnesis.history', $patientId),
             ];
         }
 
