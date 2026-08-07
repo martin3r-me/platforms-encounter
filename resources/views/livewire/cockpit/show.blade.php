@@ -224,25 +224,55 @@
                     <div class="text-xs text-[color:var(--nx-muted)]">{{ $isToday ? 'Heute' : '' }} · {{ $appointments->count() }} Termine</div>
                 </div>
 
+                {{-- Behandler-Filter --}}
+                @if(!empty($doctorChips))
+                    <div class="flex flex-wrap gap-1 px-1 pb-2">
+                        @foreach($doctorChips as $chip)
+                            <button type="button" wire:click="$set('doc', @js($chip['key']))"
+                                    @class([
+                                        'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors',
+                                        'border-[color:var(--nx-text)] bg-[color:var(--nx-active)] text-[color:var(--nx-text)]' => $doc === $chip['key'],
+                                        'border-[color:var(--nx-line)] text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]' => $doc !== $chip['key'],
+                                    ])>
+                                @if($chip['color'])<span class="w-2 h-2 rounded-full" style="background: {{ $chip['color'] }}"></span>@endif
+                                {{ $chip['label'] }}
+                            </button>
+                        @endforeach
+                    </div>
+                    @if($doc === 'mine' && !$hasMyDoctor)
+                        <div class="px-1 pb-2 text-xs text-[color:var(--nx-faint)]">Kein Arzt mit dir verknüpft — zeige alle. (Praxis → Ärzte → „Das bin ich")</div>
+                    @endif
+                @endif
+
                 @if($appointments->isEmpty())
                     <div class="px-1 py-6 text-center text-sm text-[color:var(--nx-muted)]">Keine Termine an diesem Tag.</div>
                 @else
                     <div class="space-y-0.5">
                         @foreach($appointments as $appointment)
+                            @php $lt = $appointment->location_type; $docId = $appointment->doctor_entity_id; @endphp
                             <button type="button" wire:click="selectAppointment({{ $appointment->id }})" wire:key="appt-{{ $appointment->id }}"
                                     @class([
-                                        'w-full flex items-center gap-3 px-2 py-2 rounded-md text-left transition-colors',
+                                        'w-full flex items-center gap-2 px-2 py-2 rounded-md text-left transition-colors',
                                         'hover:bg-[color:var(--nx-hover)]' => $selectedAppointmentId !== $appointment->id,
                                         'bg-[color:var(--nx-active)]' => $selectedAppointmentId === $appointment->id,
                                     ])>
+                                {{-- Behandler-Farbpunkt --}}
+                                <span class="w-1.5 h-8 shrink-0 rounded-full" style="background: {{ $docId ? \Platform\Encounter\Support\Doctors::color((int)$docId) : 'transparent' }}"></span>
                                 <span class="w-11 shrink-0 text-sm font-medium text-[color:var(--nx-text)] tabular-nums">
                                     {{ optional($appointment->scheduled_at)->format('H:i') }}
                                 </span>
                                 <span class="min-w-0 flex-1">
                                     <span class="block truncate text-sm text-[color:var(--nx-text)]">{{ $appointment->patient?->getDisplayName() ?? '—' }}</span>
-                                    @if($appointment->status)
-                                        <span class="block text-xs text-[color:var(--nx-faint)]">{{ $appointment->status->label() }}</span>
-                                    @endif
+                                    <span class="flex items-center gap-1.5 mt-0.5">
+                                        @if($lt)
+                                            <span class="inline-flex items-center gap-1 text-xs" style="color: {{ $lt->color() }}">
+                                                @svg($lt->icon(), 'w-3.5 h-3.5') {{ $lt->label() }}
+                                            </span>
+                                        @endif
+                                        @if($docId && !empty($doctorLabels[$docId]))
+                                            <span class="text-xs text-[color:var(--nx-faint)] truncate">· {{ $doctorLabels[$docId] }}</span>
+                                        @endif
+                                    </span>
                                 </span>
                             </button>
                         @endforeach

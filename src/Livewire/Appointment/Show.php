@@ -30,7 +30,7 @@ class Show extends Component
     public string $certAudience = 'patient';
 
     protected array $fields = [
-        'scheduled_at', 'status', 'performed_by', 'doctor_stamp', 'notes',
+        'scheduled_at', 'status', 'location_type', 'doctor_entity_id', 'performed_by', 'doctor_stamp', 'notes',
         'anamnesis', 'findings', 'remarks', 'confidential',
     ];
 
@@ -46,6 +46,9 @@ class Show extends Component
             }
             if ($f === 'status') {
                 $value = $value instanceof AppointmentStatus ? $value->value : $value;
+            }
+            if ($f === 'location_type') {
+                $value = $value instanceof \Platform\Encounter\Enums\LocationType ? $value->value : ($value ?: 'practice');
             }
             $this->form[$f] = $value;
         }
@@ -63,6 +66,8 @@ class Show extends Component
         return [
             'form.scheduled_at' => ['required', 'date'],
             'form.status'       => ['required', 'string'],
+            'form.location_type'    => ['nullable', 'string', 'in:practice,company,home,remote'],
+            'form.doctor_entity_id' => ['nullable', 'integer'],
             'form.performed_by' => ['nullable', 'string', 'max:255'],
             'form.doctor_stamp' => ['nullable', 'string', 'max:255'],
         ];
@@ -78,6 +83,8 @@ class Show extends Component
         foreach ($this->fields as $f) {
             $data[$f] = $this->form[$f] === '' ? null : $this->form[$f];
         }
+        $data['location_type']    = $this->form['location_type'] ?: 'practice';
+        $data['doctor_entity_id'] = $this->form['doctor_entity_id'] ?: null;
 
         $model->update($data);
 
@@ -151,9 +158,11 @@ class Show extends Component
         $model = $this->resolve($this->appointmentId)->load(['patient', 'services', 'certificates']);
 
         return view('encounter::livewire.appointment.show', [
-            'appointment'     => $model,
-            'statusOptions'   => collect(AppointmentStatus::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
-            'audienceOptions' => collect(Audience::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
+            'appointment'         => $model,
+            'statusOptions'       => collect(AppointmentStatus::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
+            'audienceOptions'     => collect(Audience::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
+            'locationTypeOptions' => \Platform\Encounter\Support\LocationTypes::allowed((int) Auth::user()->currentTeam->id),
+            'doctorOptions'       => \Platform\Encounter\Support\Doctors::options((int) Auth::user()->currentTeam->id),
         ])->layout('platform::layouts.app');
     }
 }

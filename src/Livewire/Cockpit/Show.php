@@ -28,6 +28,10 @@ class Show extends Component
     /** Rechte Fläche: 'verlauf' (Akte) | 'stammdaten'. */
     public string $tab = 'verlauf';
 
+    /** Behandler-Filter der Agenda: 'mine' (Default) | 'all' | '<doctor_entity_id>'. */
+    #[Url(as: 'doc')]
+    public string $doc = 'mine';
+
     public function mount(): void
     {
         if ($this->date === '' || !$this->isValidDate($this->date)) {
@@ -102,12 +106,33 @@ class Show extends Component
     {
         $team = (int) Auth::user()->currentTeam->id;
 
-        $appointments = AppointmentModel::query()
-            ->forTeam($team)
-            ->with('patient')
-            ->whereDate('scheduled_at', $this->date)
-            ->orderBy('scheduled_at')
-            ->get();
+        // Behandler-Roster + „mein" Arzt (für „Meine Termine").
+        $doctorLabels = \Platform\Encounter\Support\Doctors::options($team);
+        $myDoctorId   = \Platform\Encounter\Support\Doctors::forUser($team, (int) Auth::id());
+
+        $q = AppointmentModel::query()->forTeam($team)->with('patient')->whereDate('scheduled_at', $this->date);
+
+        $activeDoctorFilter = null;
+        if ($this->doc === 'mine' && $myDoctorId) {
+            $activeDoctorFilter = (int) $myDoctorId;
+        } elseif ($this->doc !== 'mine' && $this->doc !== 'all' && ctype_digit($this->doc)) {
+            $activeDoctorFilter = (int) $this->doc;
+        }
+        if ($activeDoctorFilter) {
+            $q->where('doctor_entity_id', $activeDoctorFilter);
+        }
+
+        $appointments = $q->orderBy('scheduled_at')->get();
+
+        // Filter-Chips (nur wenn Ärzte gepflegt sind).
+        $doctorChips = [];
+        if (!empty($doctorLabels)) {
+            $doctorChips[] = ['key' => 'mine', 'label' => 'Meine', 'color' => null];
+            foreach ($doctorLabels as $id => $label) {
+                $doctorChips[] = ['key' => (string) $id, 'label' => $label, 'color' => \Platform\Encounter\Support\Doctors::color((int) $id)];
+            }
+            $doctorChips[] = ['key' => 'all', 'label' => 'Alle', 'color' => null];
+        }
 
         $patient       = null;
         $grouped       = [];
@@ -141,6 +166,9 @@ class Show extends Component
             'patient'       => $patient,
             'grouped'       => $grouped,
             'dueProvisions' => $dueProvisions,
+            'doctorChips'   => $doctorChips,
+            'doctorLabels'  => $doctorLabels,
+            'hasMyDoctor'   => (bool) $myDoctorId,
         ])->layout('platform::layouts.app');
     }
 }

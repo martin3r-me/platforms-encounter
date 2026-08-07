@@ -31,6 +31,21 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <x-nx-input-datetime name="form.scheduled_at" label="Termin" wire:model="form.scheduled_at" />
                     <x-nx-input-select name="form.status" label="Status" wire:model="form.status" :options="$statusOptions" />
+                    <x-nx-input-select name="form.location_type" label="Ort" wire:model="form.location_type" :options="$locationTypeOptions" />
+                    <div>
+                        <label class="block text-sm mb-1 text-[color:var(--nx-text)]">Behandler</label>
+                        @if(empty($doctorOptions))
+                            <div class="text-sm text-[color:var(--nx-muted)] py-2">Keine Ärzte gepflegt (Praxis → Ärzte).</div>
+                        @else
+                            <select wire:model="form.doctor_entity_id"
+                                    class="block w-full rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-3 py-1.5 text-[color:var(--nx-text)]">
+                                <option value="">— kein Behandler —</option>
+                                @foreach($doctorOptions as $id => $name)
+                                    <option value="{{ $id }}">{{ $name }}</option>
+                                @endforeach
+                            </select>
+                        @endif
+                    </div>
                     <x-nx-input-text name="form.performed_by" label="Durchgeführt von" wire:model="form.performed_by" />
                     <x-nx-input-text name="form.doctor_stamp" label="Arztstempel" wire:model="form.doctor_stamp" />
                 </div>

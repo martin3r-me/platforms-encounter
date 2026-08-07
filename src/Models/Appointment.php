@@ -31,6 +31,8 @@ class Appointment extends Model
         'user_id',
         'scheduled_at',
         'status',
+        'location_type',
+        'doctor_entity_id',
         'performed_by',
         'doctor_stamp',
         'notes',
@@ -41,8 +43,9 @@ class Appointment extends Model
     ];
 
     protected $casts = [
-        'scheduled_at' => 'datetime',
-        'status'       => AppointmentStatus::class,
+        'scheduled_at'  => 'datetime',
+        'status'        => AppointmentStatus::class,
+        'location_type' => \Platform\Encounter\Enums\LocationType::class,
         // Schweigepflicht: klinischer Freitext at-rest verschlüsselt.
         'anamnesis'    => 'encrypted',
         'findings'     => 'encrypted',
