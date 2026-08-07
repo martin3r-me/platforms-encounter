@@ -42,7 +42,7 @@
                 </x-nx-empty>
             </x-nx-card>
         @else
-            {{-- Patienten-Kopf --}}
+            {{-- Patienten-Kopf + Tabs --}}
             <x-nx-card>
                 <div class="flex items-center gap-3">
                     @svg('heroicon-o-user-circle', 'w-8 h-8 text-[color:var(--nx-muted)]')
@@ -53,9 +53,88 @@
                         </div>
                     </div>
                 </div>
+                <div class="mt-3 flex items-center gap-1 border-t border-[color:var(--nx-line)] pt-3">
+                    <button type="button" wire:click="$set('tab', 'verlauf')"
+                            @class([
+                                'px-3 py-1.5 rounded-md text-sm transition-colors',
+                                'bg-[color:var(--nx-active)] text-[color:var(--nx-text)]' => $tab === 'verlauf',
+                                'text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]' => $tab !== 'verlauf',
+                            ])>Verlauf</button>
+                    <button type="button" wire:click="$set('tab', 'stammdaten')"
+                            @class([
+                                'px-3 py-1.5 rounded-md text-sm transition-colors',
+                                'bg-[color:var(--nx-active)] text-[color:var(--nx-text)]' => $tab === 'stammdaten',
+                                'text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]' => $tab !== 'stammdaten',
+                            ])>Stammdaten</button>
+                </div>
             </x-nx-card>
 
-            @if(empty($grouped))
+            @if($tab === 'verlauf' && $selectedAppointmentId)
+                {{-- Bescheinigung direkt aus dem gewählten Termin ausstellen --}}
+                <x-nx-card>
+                    <div class="flex items-center justify-between gap-3 flex-wrap">
+                        <div class="flex items-center gap-2 text-sm text-[color:var(--nx-muted)]">
+                            @svg('heroicon-o-document-check', 'w-4 h-4')
+                            <span>Bescheinigung aus diesem Termin ausstellen</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <x-nx-button variant="secondary" size="sm" wire:click="issueCertificate('patient')"
+                                         wire:confirm="Vorsorgebescheinigung (Patient) ausstellen?">Patient</x-nx-button>
+                            <x-nx-button variant="secondary" size="sm" wire:click="issueCertificate('employer')"
+                                         wire:confirm="Vorsorgebescheinigung (Arbeitgeber) ausstellen?">Arbeitgeber</x-nx-button>
+                        </div>
+                    </div>
+                </x-nx-card>
+            @endif
+
+            @if($tab === 'stammdaten')
+                {{-- Stammdaten (read-only, Bearbeiten im Patienten-Modul) --}}
+                <x-nx-card>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--nx-faint)]">Identität</h3>
+                        <a href="{{ route('patient.patients.show', $patient->id) }}" wire:navigate
+                           class="inline-flex items-center gap-1 text-xs text-[color:var(--nx-accent)] hover:underline">
+                            @svg('heroicon-o-pencil-square', 'w-3.5 h-3.5') Bearbeiten
+                        </a>
+                    </div>
+                    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                        <div><dt class="text-[color:var(--nx-muted)]">Name</dt><dd class="text-[color:var(--nx-text)]">{{ $patient->getDisplayName() ?? '—' }}</dd></div>
+                        <div><dt class="text-[color:var(--nx-muted)]">Geburtsdatum</dt><dd class="text-[color:var(--nx-text)]">{{ $patient->birth_date ? \Illuminate\Support\Carbon::parse($patient->birth_date)->format('d.m.Y') : '—' }}</dd></div>
+                        <div><dt class="text-[color:var(--nx-muted)]">Geschlecht</dt><dd class="text-[color:var(--nx-text)]">{{ $patient->gender ?: '—' }}</dd></div>
+                        <div><dt class="text-[color:var(--nx-muted)]">Nationalität</dt><dd class="text-[color:var(--nx-text)]">{{ $patient->nationality ?: '—' }}</dd></div>
+                    </dl>
+                </x-nx-card>
+
+                <x-nx-card>
+                    <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--nx-faint)] mb-3">Kontakt</h3>
+                    <div class="space-y-3 text-sm">
+                        <div>
+                            <div class="text-xs text-[color:var(--nx-muted)] mb-1">Telefon</div>
+                            @forelse($patient->phoneNumbers as $ph)
+                                <div class="text-[color:var(--nx-text)]">{{ $ph->number }} @if($ph->is_primary)<span class="text-xs text-[color:var(--nx-faint)]">· primär</span>@endif</div>
+                            @empty
+                                <div class="text-[color:var(--nx-muted)]">—</div>
+                            @endforelse
+                        </div>
+                        <div>
+                            <div class="text-xs text-[color:var(--nx-muted)] mb-1">E-Mail</div>
+                            @forelse($patient->emailAddresses as $em)
+                                <div class="text-[color:var(--nx-text)]">{{ $em->email }} @if($em->is_primary)<span class="text-xs text-[color:var(--nx-faint)]">· primär</span>@endif</div>
+                            @empty
+                                <div class="text-[color:var(--nx-muted)]">—</div>
+                            @endforelse
+                        </div>
+                        <div>
+                            <div class="text-xs text-[color:var(--nx-muted)] mb-1">Adresse</div>
+                            @forelse($patient->postalAddresses as $ad)
+                                <div class="text-[color:var(--nx-text)]">{{ trim(($ad->street ?? '').' '.($ad->house_number ?? '')) }}, {{ trim(($ad->postal_code ?? '').' '.($ad->city ?? '')) }}</div>
+                            @empty
+                                <div class="text-[color:var(--nx-muted)]">—</div>
+                            @endforelse
+                        </div>
+                    </div>
+                </x-nx-card>
+            @elseif(empty($grouped))
                 <x-nx-card>
                     <x-nx-empty icon="heroicon-o-folder-open">
                         Noch kein Verlauf. Termine, Vorsorgen und Beschäftigung erscheinen hier chronologisch.

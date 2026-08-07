@@ -25,6 +25,9 @@ class Show extends Component
 
     public ?int $selectedAppointmentId = null;
 
+    /** Rechte Fläche: 'verlauf' (Akte) | 'stammdaten'. */
+    public string $tab = 'verlauf';
+
     public function mount(): void
     {
         if ($this->date === '' || !$this->isValidDate($this->date)) {
@@ -61,6 +64,7 @@ class Show extends Component
 
         $this->selectedAppointmentId = $appointmentId;
         $this->selectedPatientId = $appointment->patient_id;
+        $this->tab = 'verlauf';
     }
 
     /** Patient direkt wählen (z. B. aus Suche) — ohne Termin. */
@@ -68,6 +72,30 @@ class Show extends Component
     {
         $this->selectedAppointmentId = null;
         $this->selectedPatientId = $patientId;
+        $this->tab = 'verlauf';
+    }
+
+    /** Bescheinigung aus dem gewählten Termin ausstellen (audience = patient|employer). */
+    public function issueCertificate(string $audienceValue): void
+    {
+        if (!$this->selectedAppointmentId) {
+            return;
+        }
+
+        $team = (int) Auth::user()->currentTeam->id;
+        $appointment = AppointmentModel::query()->forTeam($team)
+            ->with(['services', 'patient'])->find($this->selectedAppointmentId);
+
+        $audience = \Platform\Encounter\Enums\Audience::tryFrom($audienceValue);
+
+        if (!$appointment || !$audience) {
+            return;
+        }
+
+        resolve(\Platform\Encounter\Services\CertificateService::class)->issue($appointment, $audience);
+
+        $this->tab = 'verlauf';
+        $this->dispatch('toast', message: 'Bescheinigung ausgestellt.', type: 'success');
     }
 
     public function render()
@@ -86,7 +114,9 @@ class Show extends Component
         $dueProvisions = [];
 
         if ($this->selectedPatientId) {
-            $patient = PatientModel::query()->forTeam($team)->find($this->selectedPatientId);
+            $patient = PatientModel::query()->forTeam($team)
+                ->with(['phoneNumbers', 'emailAddresses', 'postalAddresses'])
+                ->find($this->selectedPatientId);
 
             if ($patient) {
                 $entries = resolve(JournalRegistry::class)->entriesFor((int) $patient->id, $team);
