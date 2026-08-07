@@ -1,6 +1,7 @@
 <?php
 
 use Platform\Encounter\Livewire\Dashboard;
+use Platform\Encounter\Livewire\Cockpit\Show as CockpitShow;
 use Platform\Encounter\Livewire\Appointment\Index as AppointmentIndex;
 use Platform\Encounter\Livewire\Appointment\Show as AppointmentShow;
 use Platform\Encounter\Livewire\Certificate\Index as CertificateIndex;
@@ -13,7 +14,8 @@ use Platform\Encounter\Livewire\Record\Show as RecordShow;
  * Der einzelne Termin ist ein Eintrag; die Akte/{patient} ist der Verlauf.
  */
 
-Route::get('/', Dashboard::class)->name('encounter.dashboard');
+Route::get('/', CockpitShow::class)->name('encounter.cockpit');
+Route::get('/kalender', Dashboard::class)->name('encounter.dashboard');
 Route::get('/akte/{patient}', RecordShow::class)->name('encounter.akte.show');
 Route::get('/appointments', AppointmentIndex::class)->name('encounter.appointments.index');
 Route::get('/appointments/{appointment}', AppointmentShow::class)->name('encounter.appointments.show');

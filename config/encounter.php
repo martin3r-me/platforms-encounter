@@ -19,17 +19,22 @@ return [
     'guard' => 'web',
 
     'navigation' => [
-        'route' => 'encounter.dashboard',
+        'route' => 'encounter.cockpit',
         'icon'  => 'heroicon-o-calendar-days',
         'order' => 35,
     ],
 
     'sidebar' => [
         [
-            'group' => 'Encounter',
+            'group' => 'Sprechstunde',
             'items' => [
                 [
-                    'label' => 'Dashboard',
+                    'label' => 'Sprechstunde',
+                    'route' => 'encounter.cockpit',
+                    'icon'  => 'heroicon-o-calendar-days',
+                ],
+                [
+                    'label' => 'Kalender',
                     'route' => 'encounter.dashboard',
                     'icon'  => 'heroicon-o-home',
                 ],
