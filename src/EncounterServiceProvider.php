@@ -27,6 +27,9 @@ class EncounterServiceProvider extends ServiceProvider
 
         // Briefkopf-Registry: practice-Modul (Standort + Arzt) liefert, encounter-Fallback als Basis.
         $this->app->singleton(\Platform\Encounter\Services\LetterheadRegistry::class);
+
+        // Bescheinigungs-Kontext-Registry: Fachmodule (occupational) liefern Firma + Vorsorgeart.
+        $this->app->singleton(\Platform\Encounter\Services\CertificateContextRegistry::class);
     }
 
     public function boot(): void
