@@ -52,12 +52,88 @@
             </x-nx-card>
         </x-nx-section>
 
+        {{-- Anamnese (Stufe B): strukturierter Fragenkatalog, anlassbezogen --}}
+        <x-nx-section icon="heroicon-o-clipboard-document-list" title="Anamnese (Fragenkatalog)"
+                      description="Fragen nach Vorsorgeanlass gefiltert. Verschlüsselt gespeichert (Schweigepflicht).">
+            <x-slot name="action">
+                <x-nx-button variant="primary" size="sm" wire:click="saveAnamnesis">
+                    @svg('heroicon-o-check', 'w-4 h-4') Anamnese speichern
+                </x-nx-button>
+            </x-slot>
+            <x-nx-card>
+                <div class="space-y-5">
+                    {{-- Vorsorgeanlass (plain-Select gegen value=Label-Quirk; .live lädt Fragen neu) --}}
+                    <div>
+                        <label class="block text-sm mb-1 text-[color:var(--nx-text)]">Vorsorgeanlass</label>
+                        @if(empty($occasionOptions))
+                            <div class="text-sm text-[color:var(--nx-muted)] py-2">Kein Anlass-Katalog (arbmedvv) verfügbar — nur allgemeine Fragen.</div>
+                        @else
+                            <select wire:model.live="anamnesisOccasion"
+                                    class="block w-full rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-3 py-1.5 text-[color:var(--nx-text)]">
+                                <option value="">— ohne Anlass (nur allgemeine Fragen) —</option>
+                                @foreach($occasionOptions as $id => $title)
+                                    <option value="{{ $id }}">{{ $title }}</option>
+                                @endforeach
+                            </select>
+                        @endif
+                    </div>
+
+                    {{-- Relevante Fragen --}}
+                    @if($anamnesisQuestions->isEmpty())
+                        <x-nx-empty icon="heroicon-o-question-mark-circle">
+                            Keine passenden Fragen. Fragenkatalog unter Praxis → Einstellungen pflegen.
+                        </x-nx-empty>
+                    @else
+                        <div class="space-y-4">
+                            @foreach($anamnesisQuestions as $q)
+                                <div wire:key="anq-{{ $q->id }}">
+                                    <label class="block text-sm mb-1 text-[color:var(--nx-text)]">
+                                        {{ $q->text }}
+                                        @if($q->section)
+                                            <span class="text-xs text-[color:var(--nx-faint)]">· {{ $q->section }}</span>
+                                        @endif
+                                    </label>
+                                    @php($qt = $q->type instanceof \Platform\Encounter\Enums\QuestionType ? $q->type->value : $q->type)
+                                    @if($qt === 'yes_no')
+                                        <select wire:model="anamnesisAnswers.{{ $q->id }}"
+                                                class="block w-full rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-3 py-1.5 text-[color:var(--nx-text)]">
+                                            <option value="">—</option>
+                                            <option value="ja">Ja</option>
+                                            <option value="nein">Nein</option>
+                                            <option value="unbekannt">Unbekannt</option>
+                                        </select>
+                                    @elseif($qt === 'choice')
+                                        <select wire:model="anamnesisAnswers.{{ $q->id }}"
+                                                class="block w-full rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-3 py-1.5 text-[color:var(--nx-text)]">
+                                            <option value="">—</option>
+                                            @foreach(($q->options ?? []) as $opt)
+                                                <option value="{{ $opt }}">{{ $opt }}</option>
+                                            @endforeach
+                                        </select>
+                                    @elseif($qt === 'scale')
+                                        <input type="number" wire:model="anamnesisAnswers.{{ $q->id }}"
+                                               class="block w-full rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-3 py-1.5 text-[color:var(--nx-text)]" />
+                                    @else
+                                        <input type="text" wire:model="anamnesisAnswers.{{ $q->id }}"
+                                               class="block w-full rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-3 py-1.5 text-[color:var(--nx-text)]" />
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    <x-nx-input-textarea name="anamnesisFreeText" label="Ergänzende Angaben (Freitext)"
+                                         wire:model="anamnesisFreeText" rows="3" />
+                </div>
+            </x-nx-card>
+        </x-nx-section>
+
         {{-- Klinischer Freitext (verschlüsselt) --}}
-        <x-nx-section icon="heroicon-o-lock-closed" title="Anamnese &amp; Befund"
+        <x-nx-section icon="heroicon-o-lock-closed" title="Befund &amp; Notizen (Freitext)"
                       description="Verschlüsselt gespeichert (Schweigepflicht).">
             <x-nx-card>
                 <div class="space-y-4">
-                    <x-nx-input-textarea name="form.anamnesis" label="Anamnese" wire:model="form.anamnesis" rows="4" />
+                    <x-nx-input-textarea name="form.anamnesis" label="Anamnese (Freitext)" wire:model="form.anamnesis" rows="4" />
                     <x-nx-input-textarea name="form.findings" label="Befund" wire:model="form.findings" rows="4" />
                     <x-nx-input-textarea name="form.remarks" label="Bemerkungen" wire:model="form.remarks" rows="3" />
                     <x-nx-input-textarea name="form.confidential" label="Vertraulich" wire:model="form.confidential" rows="3" />

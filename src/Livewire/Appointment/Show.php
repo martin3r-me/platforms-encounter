@@ -7,6 +7,8 @@ use Livewire\Component;
 use Illuminate\Support\Facades\Auth;
 use Platform\Encounter\Models\Appointment as AppointmentModel;
 use Platform\Encounter\Models\Service as ServiceModel;
+use Platform\Encounter\Models\Anamnesis as AnamnesisModel;
+use Platform\Encounter\Models\AnamnesisQuestion;
 use Platform\Encounter\Enums\AppointmentStatus;
 use Platform\Encounter\Enums\Audience;
 use Platform\Encounter\Services\CertificateService;
@@ -28,6 +30,14 @@ class Show extends Component
 
     public bool $showCertModal = false;
     public string $certAudience = 'patient';
+
+    // --- Anamnese (Stufe B): strukturierte Erfassung je Termin ---
+    public ?int $anamnesisId = null;
+    /** Vorsorgeanlass (arbmedvv_occasion-ID als String; '' = ohne Anlass). Plain-Select → kein value=Label-Quirk. */
+    public string $anamnesisOccasion = '';
+    /** {question_id: value} */
+    public array $anamnesisAnswers = [];
+    public string $anamnesisFreeText = '';
 
     protected array $fields = [
         'scheduled_at', 'status', 'location_type', 'doctor_entity_id', 'performed_by', 'doctor_stamp', 'notes',
@@ -52,6 +62,33 @@ class Show extends Component
             }
             $this->form[$f] = $value;
         }
+
+        $this->loadAnamnesis($model);
+    }
+
+    /** Bestehende Anamnese des Termins laden (falls vorhanden). */
+    protected function loadAnamnesis(AppointmentModel $model): void
+    {
+        $existing = AnamnesisModel::query()
+            ->forTeam((int) $model->team_id)
+            ->where('appointment_id', $model->id)
+            ->latest('id')
+            ->first();
+
+        if (!$existing) {
+            $this->anamnesisId       = null;
+            $this->anamnesisOccasion = '';
+            $this->anamnesisAnswers  = [];
+            $this->anamnesisFreeText = '';
+            return;
+        }
+
+        $this->anamnesisId       = $existing->id;
+        $this->anamnesisOccasion = $existing->catalog_type === 'arbmedvv_occasion' && $existing->catalog_id
+            ? (string) $existing->catalog_id
+            : '';
+        $this->anamnesisAnswers  = $existing->answers ?? [];
+        $this->anamnesisFreeText = (string) ($existing->free_text ?? '');
     }
 
     protected function resolve(int $id): AppointmentModel
@@ -153,9 +190,82 @@ class Show extends Component
         return $this->redirectRoute('encounter.certificates.show', ['certificate' => $certificate->id], navigate: true);
     }
 
+    /**
+     * Relevante Fragen: allgemeine (ohne Anlass) + die des gewählten Vorsorgeanlasses.
+     * @return \Illuminate\Support\Collection<int,AnamnesisQuestion>
+     */
+    protected function relevantQuestions(int $team): \Illuminate\Support\Collection
+    {
+        $occasionId = ctype_digit($this->anamnesisOccasion) ? (int) $this->anamnesisOccasion : null;
+
+        return AnamnesisQuestion::query()
+            ->forTeam($team)->active()
+            ->where(function ($q) use ($occasionId) {
+                $q->whereNull('catalog_type');
+                if ($occasionId) {
+                    $q->orWhere(function ($qq) use ($occasionId) {
+                        $qq->where('catalog_type', 'arbmedvv_occasion')->where('catalog_id', $occasionId);
+                    });
+                }
+            })
+            ->orderBy('section')->orderBy('position')->orderBy('id')
+            ->get();
+    }
+
+    /** Anamnese des Termins speichern (updateOrCreate je Termin). */
+    public function saveAnamnesis(): void
+    {
+        $model = $this->resolve($this->appointmentId);
+        $team  = (int) $model->team_id;
+
+        $occasionId = ctype_digit($this->anamnesisOccasion) ? (int) $this->anamnesisOccasion : null;
+
+        // Nur Antworten auf tatsächlich relevante Fragen persistieren.
+        $validIds = $this->relevantQuestions($team)->pluck('id')->all();
+        $answers  = [];
+        foreach ($this->anamnesisAnswers as $qid => $val) {
+            if (in_array((int) $qid, $validIds, true) && $val !== '' && $val !== null) {
+                $answers[(int) $qid] = $val;
+            }
+        }
+
+        $anamnesis = $this->anamnesisId
+            ? AnamnesisModel::query()->forTeam($team)->find($this->anamnesisId)
+            : null;
+
+        $data = [
+            'patient_id'   => $model->patient_id,
+            'catalog_type' => $occasionId ? 'arbmedvv_occasion' : null,
+            'catalog_id'   => $occasionId,
+            'answers'      => $answers,
+            'free_text'    => $this->anamnesisFreeText ?: null,
+        ];
+
+        if ($anamnesis) {
+            $anamnesis->update($data);
+        } else {
+            $anamnesis = AnamnesisModel::create(array_merge($data, [
+                'team_id'        => $team,
+                'appointment_id' => $model->id,
+            ]));
+            $this->anamnesisId = $anamnesis->id;
+        }
+
+        $this->dispatch('toast', message: 'Anamnese gespeichert.', type: 'success');
+    }
+
     public function render()
     {
         $model = $this->resolve($this->appointmentId)->load(['patient', 'services', 'certificates']);
+        $team  = (int) $model->team_id;
+
+        // Vorsorgeanlässe (arbmedvv) guarded — plain-Select-Werte (ID) gegen den value=Label-Quirk.
+        $occasionOptions = [];
+        if (class_exists(\Platform\Arbmedvv\Models\Occasion::class)) {
+            foreach (\Platform\Arbmedvv\Models\Occasion::query()->where('team_id', $team)->orderBy('title')->get() as $o) {
+                $occasionOptions[(int) $o->id] = $o->title;
+            }
+        }
 
         return view('encounter::livewire.appointment.show', [
             'appointment'         => $model,
@@ -163,6 +273,8 @@ class Show extends Component
             'audienceOptions'     => collect(Audience::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
             'locationTypeOptions' => \Platform\Encounter\Support\LocationTypes::allowed((int) Auth::user()->currentTeam->id),
             'doctorOptions'       => \Platform\Encounter\Support\Doctors::options((int) Auth::user()->currentTeam->id),
+            'occasionOptions'     => $occasionOptions,
+            'anamnesisQuestions'  => $this->relevantQuestions($team),
         ])->layout('platform::layouts.app');
     }
 }

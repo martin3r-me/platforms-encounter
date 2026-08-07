@@ -38,6 +38,7 @@ class EncounterServiceProvider extends ServiceProvider
             'encounter_certificate' => Certificate::class,
             'encounter_text_block'  => TextBlock::class,
             'encounter_anamnesis_question' => \Platform\Encounter\Models\AnamnesisQuestion::class,
+            'encounter_anamnesis'          => \Platform\Encounter\Models\Anamnesis::class,
         ]);
 
         if (
@@ -100,8 +101,9 @@ class EncounterServiceProvider extends ServiceProvider
     protected function registerJournalProvider(): void
     {
         try {
-            resolve(\Platform\Encounter\Services\JournalRegistry::class)
-                ->register(new \Platform\Encounter\Journal\EncounterJournalProvider());
+            $registry = resolve(\Platform\Encounter\Services\JournalRegistry::class);
+            $registry->register(new \Platform\Encounter\Journal\EncounterJournalProvider());
+            $registry->register(new \Platform\Encounter\Journal\AnamnesisJournalProvider());
         } catch (\Throwable $e) {
             // ignorieren
         }
