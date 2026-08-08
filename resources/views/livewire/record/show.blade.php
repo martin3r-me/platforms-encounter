@@ -2,7 +2,15 @@
     Encounter · Patientenakte — die EINE Personen-Sicht (Tabs komponieren die Fachmodule).
     Verlauf (Timeline) · Stammdaten · Betriebsärztlich · Bescheinigungen. Rechts: Werte & Status.
 --}}
-@php $weekdays = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag']; @endphp
+@php
+    $weekdays = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+    $tabs = [
+        'verlauf'           => ['Verlauf', $entries ? count($entries) : 0],
+        'stammdaten'        => ['Stammdaten', null],
+        'betriebsaerztlich' => ['Betriebsärztlich', $provisions->count() + $employments->count()],
+        'bescheinigungen'   => ['Bescheinigungen', $certificates->count()],
+    ];
+@endphp
 
 <x-ui-page>
     <x-slot name="navbar">
@@ -38,14 +46,6 @@
                 </div>
             </div>
 
-            @php
-                $tabs = [
-                    'verlauf'          => ['Verlauf', $entries ? count($entries) : 0],
-                    'stammdaten'       => ['Stammdaten', null],
-                    'betriebsaerztlich'=> ['Betriebsärztlich', $provisions->count() + $employments->count()],
-                    'bescheinigungen'  => ['Bescheinigungen', $certificates->count()],
-                ];
-            @endphp
             <div class="mt-3 flex items-center gap-1 border-t border-[color:var(--nx-line)] pt-3 overflow-x-auto">
                 @foreach($tabs as $key => $t)
                     <button type="button" wire:click="$set('tab', '{{ $key }}')"
