@@ -35,8 +35,46 @@ class Show extends Component
     public function mount(): void
     {
         if ($this->date === '' || !$this->isValidDate($this->date)) {
-            $this->date = now()->toDateString();
+            $this->date = $this->resolveInitialDate();
         }
+    }
+
+    /**
+     * Sinnvoller Einstiegstag: der nächste Tag mit Terminen (>= heute, im aktiven
+     * Behandler-Filter), sonst der letzte vergangene Tag mit Terminen, sonst heute.
+     * Verhindert den leeren „heute = 0 Termine"-Einstieg.
+     */
+    protected function resolveInitialDate(): string
+    {
+        $today = now()->toDateString();
+        $team  = (int) Auth::user()->currentTeam->id;
+
+        $base = AppointmentModel::query()->forTeam($team);
+
+        $myDoctorId = \Platform\Encounter\Support\Doctors::forUser($team, (int) Auth::id());
+        $filter = null;
+        if ($this->doc === 'mine' && $myDoctorId) {
+            $filter = (int) $myDoctorId;
+        } elseif ($this->doc !== 'mine' && $this->doc !== 'all' && ctype_digit($this->doc)) {
+            $filter = (int) $this->doc;
+        }
+        if ($filter) {
+            $base->where('doctor_entity_id', $filter);
+        }
+
+        $next = (clone $base)->whereDate('scheduled_at', '>=', $today)
+            ->orderBy('scheduled_at')->value('scheduled_at');
+        if ($next) {
+            return Carbon::parse($next)->toDateString();
+        }
+
+        $prev = (clone $base)->whereDate('scheduled_at', '<', $today)
+            ->orderByDesc('scheduled_at')->value('scheduled_at');
+        if ($prev) {
+            return Carbon::parse($prev)->toDateString();
+        }
+
+        return $today;
     }
 
     protected function isValidDate(string $d): bool
