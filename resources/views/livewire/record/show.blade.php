@@ -67,7 +67,7 @@
             @else
                 <div class="space-y-6">
                     @foreach($grouped as $dateKey => $dayEntries)
-                        @php $d = \Illuminate\Support\Carbon::parse($dateKey); @endphp
+                        @php($d = \Illuminate\Support\Carbon::parse($dateKey))
                         <div>
                             <div class="sticky top-0 z-10 mb-2 py-1 bg-[color:var(--nx-bg)]">
                                 <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--nx-faint)]">{{ $weekdays[$d->dayOfWeek] }}, {{ $d->format('d.m.Y') }}</h3>
