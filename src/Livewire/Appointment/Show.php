@@ -214,16 +214,15 @@ class Show extends Component
     {
         $occasionId = ctype_digit($this->anamnesisOccasion) ? (int) $this->anamnesisOccasion : null;
 
+        // Anzeige folgt dem Select: konkreter Anlass -> nur dessen spezifische Fragen;
+        // "ohne Anlass" -> nur die allgemeinen Fragen. Kein Mischen (offensichtlicher für den Arzt).
         return AnamnesisQuestion::query()
             ->forTeam($team)->active()
-            ->where(function ($q) use ($occasionId) {
-                $q->whereNull('catalog_type');
-                if ($occasionId) {
-                    $q->orWhere(function ($qq) use ($occasionId) {
-                        $qq->where('catalog_type', 'arbmedvv_occasion')->where('catalog_id', $occasionId);
-                    });
-                }
-            })
+            ->when(
+                $occasionId,
+                fn ($q) => $q->where('catalog_type', 'arbmedvv_occasion')->where('catalog_id', $occasionId),
+                fn ($q) => $q->whereNull('catalog_type')
+            )
             ->orderBy('section')->orderBy('position')->orderBy('id')
             ->get();
     }

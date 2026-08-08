@@ -61,7 +61,7 @@
 
         {{-- Anamnese (Stufe B): strukturierter Fragenkatalog, anlassbezogen --}}
         <x-nx-section icon="heroicon-o-clipboard-document-list" title="Anamnese (Fragenkatalog)"
-                      description="Fragen nach Vorsorgeanlass gefiltert. Verschlüsselt gespeichert (Schweigepflicht).">
+                      description="Ohne Anlass erscheinen die allgemeinen Fragen, mit Anlass die spezifischen. Verschlüsselt gespeichert (Schweigepflicht).">
             <x-slot name="action">
                 <x-nx-button variant="primary" size="sm" wire:click="saveAnamnesis">
                     @svg('heroicon-o-check', 'w-4 h-4') Anamnese speichern
@@ -88,7 +88,11 @@
                     {{-- Relevante Fragen --}}
                     @if($anamnesisQuestions->isEmpty())
                         <x-nx-empty icon="heroicon-o-question-mark-circle">
-                            Keine passenden Fragen. Fragenkatalog unter Praxis → Einstellungen pflegen.
+                            @if($anamnesisOccasion !== '')
+                                Für diesen Anlass sind noch keine spezifischen Fragen hinterlegt.
+                            @else
+                                Noch keine allgemeinen Fragen. Fragenkatalog unter Praxis → Einstellungen pflegen.
+                            @endif
                         </x-nx-empty>
                     @else
                         <div class="space-y-4">
