@@ -199,7 +199,12 @@ class Show extends Component
 
         $appointment = $this->resolve($this->appointmentId);
 
-        $certificate = app(CertificateService::class)->issue($appointment, $audience);
+        try {
+            $certificate = app(CertificateService::class)->issue($appointment, $audience);
+        } catch (\RuntimeException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
+            return;
+        }
 
         $this->showCertModal = false;
 

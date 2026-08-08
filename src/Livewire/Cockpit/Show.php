@@ -142,7 +142,12 @@ class Show extends Component
             return;
         }
 
-        resolve(\Platform\Encounter\Services\CertificateService::class)->issue($appointment, $audience);
+        try {
+            resolve(\Platform\Encounter\Services\CertificateService::class)->issue($appointment, $audience);
+        } catch (\RuntimeException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
+            return;
+        }
 
         $this->tab = 'verlauf';
         $this->dispatch('toast', message: 'Bescheinigung ausgestellt.', type: 'success');

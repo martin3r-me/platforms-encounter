@@ -127,6 +127,9 @@ class CertificateService
     {
         $appointment->loadMissing(['services', 'patient']);
 
+        // Vermengungsregel: eine Bescheinigung darf nur EINE Gruppe zusammenfassen (z.B. nicht Vorsorge + Eignung).
+        $this->assertNoCombinationConflict($appointment);
+
         $title = $title ?: match ($audience) {
             Audience::Employer => 'Vorsorgebescheinigung (Arbeitgeber)',
             Audience::Patient  => 'Vorsorgebescheinigung',
@@ -142,5 +145,33 @@ class CertificateService
             'content'        => $this->buildContent($appointment, $audience),
             'status'         => CertificateStatus::Issued->value,
         ]);
+    }
+
+    /**
+     * Verhindert eine Bescheinigung, die verschiedene Vermengungsgruppen zusammenfasst
+     * (erbrachte Leistungen = examination + Vorsorgeanlass der Anamnese = arbmedvv_occasion),
+     * geprüft über die Core-Registry (lose gekoppelt).
+     */
+    protected function assertNoCombinationConflict(Appointment $appointment): void
+    {
+        $refs = [];
+        foreach ($appointment->services as $s) {
+            if ($s->catalog_type === 'examination' && $s->catalog_id) {
+                $refs[] = ['type' => 'examination', 'id' => (int) $s->catalog_id];
+            }
+        }
+
+        $anamnesis = \Platform\Encounter\Models\Anamnesis::query()
+            ->where('appointment_id', $appointment->id)->latest('id')->first();
+        if ($anamnesis && $anamnesis->catalog_type === 'arbmedvv_occasion' && $anamnesis->catalog_id) {
+            $refs[] = ['type' => 'arbmedvv_occasion', 'id' => (int) $anamnesis->catalog_id];
+        }
+
+        $groups = app(\Platform\Core\Support\CatalogCombinationRegistry::class)->groupsFor($refs);
+        if (count($groups) > 1) {
+            $labels = config('examinations.combination_groups', ['vorsorge' => 'Vorsorge', 'eignung' => 'Eignung']);
+            $text   = implode(' + ', array_map(fn ($g) => $labels[$g] ?? $g, $groups));
+            throw new \RuntimeException("Bescheinigung nicht möglich: {$text} dürfen nicht auf einer Bescheinigung zusammengefasst werden. Bitte den Termin auf getrennte Termine aufteilen.");
+        }
     }
 }
