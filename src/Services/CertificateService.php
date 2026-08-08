@@ -9,6 +9,7 @@ use Platform\Encounter\Models\Anamnesis;
 use Platform\Encounter\Enums\Audience;
 use Platform\Encounter\Enums\CertificateStatus;
 use Platform\Encounter\Services\CertificateContextRegistry;
+use Platform\Encounter\Services\CertificateLifecycleRegistry;
 use Platform\Encounter\Services\LetterheadRegistry;
 
 /**
@@ -136,7 +137,7 @@ class CertificateService
             default            => 'Bescheinigung (' . $audience->label() . ')',
         };
 
-        return Certificate::create([
+        $certificate = Certificate::create([
             'team_id'        => $appointment->team_id,
             'appointment_id' => $appointment->id,
             'patient_id'     => $appointment->patient_id,
@@ -145,6 +146,37 @@ class CertificateService
             'content'        => $this->buildContent($appointment, $audience),
             'status'         => CertificateStatus::Issued->value,
         ]);
+
+        // Push: Fachmodule fortschreiben lassen (z.B. occupational → Vorsorge-Kartei).
+        // encounter bleibt fachneutral; Listener-Fehler dürfen die Ausstellung nicht brechen.
+        [$occasionType, $occasionId] = $this->resolveOccasion($appointment);
+        resolve(CertificateLifecycleRegistry::class)->notifyIssued([
+            'certificate_id' => $certificate->id,
+            'patient_id'     => (int) $appointment->patient_id,
+            'team_id'        => (int) $appointment->team_id,
+            'occasion_type'  => $occasionType,
+            'occasion_id'    => $occasionId,
+            'examined_on'    => optional($appointment->scheduled_at)->toDateString(),
+            'audience'       => $audience->value,
+        ]);
+
+        return $certificate;
+    }
+
+    /**
+     * Vorsorgeanlass des Termins aus der (letzten) Anamnese — morphMap arbmedvv_occasion.
+     * @return array{0:?string,1:?int} [occasion_type, occasion_id]
+     */
+    protected function resolveOccasion(Appointment $appointment): array
+    {
+        $anamnesis = Anamnesis::query()->forTeam((int) $appointment->team_id)
+            ->where('appointment_id', $appointment->id)->latest('id')->first();
+
+        if ($anamnesis && $anamnesis->catalog_type === 'arbmedvv_occasion' && $anamnesis->catalog_id) {
+            return ['arbmedvv_occasion', (int) $anamnesis->catalog_id];
+        }
+
+        return [null, null];
     }
 
     /**

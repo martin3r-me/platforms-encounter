@@ -30,6 +30,10 @@ class EncounterServiceProvider extends ServiceProvider
 
         // Bescheinigungs-Kontext-Registry: Fachmodule (occupational) liefern Firma + Vorsorgeart.
         $this->app->singleton(\Platform\Encounter\Services\CertificateContextRegistry::class);
+
+        // Bescheinigungs-Lifecycle-Registry: Fachmodule reagieren auf „ausgestellt" (Push) —
+        // z.B. occupational schreibt die Vorsorge-Kartei fort (last_done_at + next_due_at).
+        $this->app->singleton(\Platform\Encounter\Services\CertificateLifecycleRegistry::class);
     }
 
     public function boot(): void
