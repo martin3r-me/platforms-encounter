@@ -36,15 +36,29 @@ class Doctors
     /** person_entity_id des mit dem User verknüpften Arztes („meine Termine"), sonst null. */
     public static function forUser(int $teamId, int $userId): ?int
     {
+        // Primär: kanonische „wer bin ich" aus dem Org-Graphen (linked_user_id) — arzt-
+        // unabhängig, funktioniert für jedes verknüpfte Personal.
+        if (class_exists(\Platform\Organization\Support\CurrentPerson::class)) {
+            try {
+                $id = \Platform\Organization\Support\CurrentPerson::entityId($userId);
+                if ($id) {
+                    return $id;
+                }
+            } catch (\Throwable $e) {
+                // organization nicht verfügbar — Fallback unten.
+            }
+        }
+
+        // Fallback: „Das bin ich" aus practice_doctors (Legacy, wenn keine Org-Verknüpfung).
         if (!class_exists(\Platform\Practice\Models\PracticeDoctor::class)) {
             return null;
         }
 
         try {
-            return \Platform\Practice\Models\PracticeDoctor::query()
+            $id = \Platform\Practice\Models\PracticeDoctor::query()
                 ->where('team_id', $teamId)->where('user_id', $userId)->value('person_entity_id');
+            return $id ? (int) $id : null;
         } catch (\Throwable $e) {
-            // Spalte user_id evtl. noch nicht migriert.
             return null;
         }
     }
