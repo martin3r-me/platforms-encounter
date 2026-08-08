@@ -8,10 +8,17 @@
     </x-slot>
 
     <x-slot name="actionbar">
-        <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Termine', 'route' => 'encounter.appointments.index', 'icon' => 'calendar-days'],
+        <x-ui-page-actionbar :breadcrumbs="array_values(array_filter([
+            ['label' => 'Sprechstunde', 'route' => 'encounter.cockpit', 'icon' => 'calendar-days'],
+            $appointment->patient ? ['label' => $appointment->patient->getDisplayName() ?? '—', 'route' => 'encounter.akte.show', 'params' => ['patient' => $appointment->patient->id], 'icon' => 'folder-open'] : null,
             ['label' => optional($appointment->scheduled_at)->format('d.m.Y H:i') ?? 'Termin'],
-        ]">
+        ]))">
+            @if($appointment->patient)
+                <x-nx-button variant="ghost" size="sm" :href="route('encounter.akte.show', $appointment->patient->id)" wire:navigate>
+                    @svg('heroicon-o-folder-open', 'w-4 h-4')
+                    <span>Zur Akte</span>
+                </x-nx-button>
+            @endif
             <x-nx-button variant="primary" size="sm" wire:click="save">
                 @svg('heroicon-o-check', 'w-4 h-4')
                 <span>Speichern</span>
@@ -235,24 +242,85 @@
                 <div>
                     <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--nx-faint)] mb-3">Patient</h3>
                     @if($appointment->patient)
-                        <a href="{{ route('patient.patients.show', $appointment->patient->id) }}" wire:navigate
-                           class="text-sm text-[color:var(--nx-accent)] hover:underline">
+                        <a href="{{ route('encounter.akte.show', $appointment->patient->id) }}" wire:navigate
+                           class="text-sm font-medium text-[color:var(--nx-accent)] hover:underline">
                             {{ $appointment->patient->getDisplayName() }}
                         </a>
+                        @if($appointment->patient->birth_date)
+                            <div class="mt-1 text-xs text-[color:var(--nx-muted)]">
+                                geb. {{ \Illuminate\Support\Carbon::parse($appointment->patient->birth_date)->format('d.m.Y') }}
+                                ({{ \Illuminate\Support\Carbon::parse($appointment->patient->birth_date)->age }} J.)
+                            </div>
+                        @endif
                     @else
                         <div class="text-sm text-[color:var(--nx-muted)]">—</div>
                     @endif
                 </div>
+
+                @if($ctxEmployment)
+                    <div>
+                        <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--nx-faint)] mb-2">Beschäftigung</h3>
+                        <div class="text-sm text-[color:var(--nx-text)]">{{ $ctxEmployment->organizationEntity->name ?? '—' }}</div>
+                        @if($ctxEmployment->position)
+                            <div class="text-xs text-[color:var(--nx-muted)]">{{ $ctxEmployment->position }}</div>
+                        @endif
+                    </div>
+                @endif
             </div>
         </x-ui-page-sidebar>
     </x-slot>
 
     <x-slot name="activity">
-        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" storeKey="activityOpen" side="right">
+        <x-ui-page-sidebar title="Patienten-Kontext" icon="heroicon-o-identification" width="w-80" :defaultOpen="true" storeKey="activityOpen" side="right">
             <div class="p-6 space-y-6">
+                @if($appointment->patient)
+                    <a href="{{ route('encounter.akte.show', $appointment->patient->id) }}" wire:navigate
+                       class="flex items-center justify-center gap-2 w-full rounded-md border border-[color:var(--nx-line)] px-3 py-2 text-sm font-medium text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)] transition-colors">
+                        @svg('heroicon-o-folder-open', 'w-4 h-4') Volle Akte öffnen
+                    </a>
+                @endif
+
+                {{-- Fällige / offene Vorsorgen — die Handlungspunkte --}}
                 <div>
-                    <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--nx-faint)] mb-3">Letzte Aktivitäten</h3>
-                    <div class="text-sm text-[color:var(--nx-muted)]">Keine Aktivitäten verfügbar.</div>
+                    <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--nx-faint)] mb-3">Vorsorgen</h3>
+                    @if($ctxProvisions->isEmpty())
+                        <div class="text-sm text-[color:var(--nx-muted)]">Keine Vorsorgen hinterlegt.</div>
+                    @else
+                        <ul class="space-y-2">
+                            @foreach($ctxProvisions as $p)
+                                @php($due = $p->next_due_at ? \Illuminate\Support\Carbon::parse($p->next_due_at) : null)
+                                @php($overdue = $due && $due->isPast())
+                                <li class="flex items-start justify-between gap-2">
+                                    <span class="text-sm text-[color:var(--nx-text)] min-w-0 truncate">{{ $p->occasion->title ?? 'Vorsorge' }}</span>
+                                    @if($due)
+                                        <x-nx-badge :variant="$overdue ? 'danger' : 'default'" dot>{{ $due->format('d.m.Y') }}</x-nx-badge>
+                                    @else
+                                        <span class="text-xs text-[color:var(--nx-faint)] shrink-0">offen</span>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+
+                {{-- Letzte Termine — Historie, klickbar --}}
+                <div>
+                    <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--nx-faint)] mb-3">Letzte Termine</h3>
+                    @if($ctxRecent->isEmpty())
+                        <div class="text-sm text-[color:var(--nx-muted)]">Keine weiteren Termine.</div>
+                    @else
+                        <ul class="space-y-1">
+                            @foreach($ctxRecent as $a)
+                                <li>
+                                    <a href="{{ route('encounter.appointments.show', $a->id) }}" wire:navigate
+                                       class="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 -mx-2 hover:bg-[color:var(--nx-hover)] transition-colors">
+                                        <span class="text-sm text-[color:var(--nx-text)] tabular-nums">{{ optional($a->scheduled_at)->format('d.m.Y') }}</span>
+                                        <span class="text-xs text-[color:var(--nx-faint)]">{{ $a->status instanceof \Platform\Encounter\Enums\AppointmentStatus ? $a->status->label() : $a->status }}</span>
+                                    </a>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
                 </div>
             </div>
         </x-ui-page-sidebar>

@@ -304,7 +304,7 @@ class Show extends Component
             }
         }
 
-        return view('encounter::livewire.appointment.show', [
+        return view('encounter::livewire.appointment.show', array_merge([
             'appointment'         => $model,
             'statusOptions'       => collect(AppointmentStatus::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
             'audienceOptions'     => collect(Audience::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
@@ -313,6 +313,49 @@ class Show extends Component
             'occasionOptions'     => $occasionOptions,
             'anamnesisQuestions'  => $this->relevantQuestions($team),
             'examinationOptions'  => $this->examinationOptions($team),
-        ])->layout('platform::layouts.app');
+        ], $this->patientContext($model, $team)))->layout('platform::layouts.app');
+    }
+
+    /**
+     * Patienten-Gesamtkontext für die rechte Sidebar des Termins — der Patient ist der Anker.
+     * Guarded, damit der Termin auch ohne occupational/Schema-Drift lädt.
+     *
+     * @return array{ctxProvisions:\Illuminate\Support\Collection,ctxEmployment:mixed,ctxRecent:\Illuminate\Support\Collection}
+     */
+    protected function patientContext(AppointmentModel $model, int $team): array
+    {
+        $patientId = (int) $model->patient_id;
+
+        $provisions = collect();
+        $employment = null;
+        if ($patientId && class_exists(\Platform\Occupational\Models\Provision::class)) {
+            try {
+                $provisions = \Platform\Occupational\Models\Provision::query()->forTeam($team)
+                    ->where('patient_id', $patientId)->with('occasion')
+                    ->orderByRaw('next_due_at is null')->orderBy('next_due_at')->limit(6)->get();
+                $employment = \Platform\Occupational\Models\Employment::query()->forTeam($team)
+                    ->where('patient_id', $patientId)->with('organizationEntity')
+                    ->orderByDesc('active')->orderByDesc('started_at')->first();
+            } catch (\Throwable $e) {
+                // occupational nicht verfügbar / Schema-Drift.
+            }
+        }
+
+        // Letzte Termine desselben Patienten (ohne den aktuellen).
+        $recent = collect();
+        if ($patientId) {
+            try {
+                $recent = AppointmentModel::query()->forTeam($team)
+                    ->where('patient_id', $patientId)->whereKeyNot($model->id)
+                    ->orderByDesc('scheduled_at')->limit(5)->get();
+            } catch (\Throwable $e) {
+            }
+        }
+
+        return [
+            'ctxProvisions' => $provisions,
+            'ctxEmployment' => $employment,
+            'ctxRecent'     => $recent,
+        ];
     }
 }
