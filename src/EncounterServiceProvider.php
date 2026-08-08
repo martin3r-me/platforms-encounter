@@ -142,6 +142,12 @@ class EncounterServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Encounter\Tools\UpdateTextBlockTool());
             $registry->register(new \Platform\Encounter\Tools\DeleteTextBlockTool());
 
+            // Anamnese-Fragenkatalog (settings-Schicht, an ArbMedVV-Anlass gebunden)
+            $registry->register(new \Platform\Encounter\Tools\ListAnamnesisQuestionsTool());
+            $registry->register(new \Platform\Encounter\Tools\CreateAnamnesisQuestionTool());
+            $registry->register(new \Platform\Encounter\Tools\UpdateAnamnesisQuestionTool());
+            $registry->register(new \Platform\Encounter\Tools\DeleteAnamnesisQuestionTool());
+
             // Settings: Feld-Definitionen
             $registry->register(new \Platform\Encounter\Tools\ListFieldDefinitionsTool());
             $registry->register(new \Platform\Encounter\Tools\CreateFieldDefinitionTool());
