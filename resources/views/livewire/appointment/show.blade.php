@@ -239,30 +239,57 @@
     <x-slot name="sidebar">
         <x-ui-page-sidebar title="Übersicht" width="w-80" :defaultOpen="true">
             <div class="p-6 space-y-6">
+                {{-- Patient --}}
                 <div>
                     <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--nx-faint)] mb-3">Patient</h3>
                     @if($appointment->patient)
-                        <a href="{{ route('encounter.akte.show', $appointment->patient->id) }}" wire:navigate
+                        @php($pt = $appointment->patient)
+                        <a href="{{ route('encounter.akte.show', $pt->id) }}" wire:navigate
                            class="text-sm font-medium text-[color:var(--nx-accent)] hover:underline">
-                            {{ $appointment->patient->getDisplayName() }}
+                            {{ $pt->getDisplayName() }}
                         </a>
-                        @if($appointment->patient->birth_date)
-                            <div class="mt-1 text-xs text-[color:var(--nx-muted)]">
-                                geb. {{ \Illuminate\Support\Carbon::parse($appointment->patient->birth_date)->format('d.m.Y') }}
-                                ({{ \Illuminate\Support\Carbon::parse($appointment->patient->birth_date)->age }} J.)
-                            </div>
-                        @endif
+                        <div class="mt-1 text-xs text-[color:var(--nx-muted)] space-y-0.5">
+                            @if($pt->birth_date)
+                                <div>geb. {{ \Illuminate\Support\Carbon::parse($pt->birth_date)->format('d.m.Y') }} ({{ \Illuminate\Support\Carbon::parse($pt->birth_date)->age }} J.)</div>
+                            @endif
+                            @if($pt->gender)
+                                <div>{{ ['male'=>'männlich','female'=>'weiblich','diverse'=>'divers','m'=>'männlich','w'=>'weiblich','d'=>'divers'][$pt->gender] ?? $pt->gender }}</div>
+                            @endif
+                        </div>
                     @else
                         <div class="text-sm text-[color:var(--nx-muted)]">—</div>
                     @endif
                 </div>
 
+                {{-- Kontakt --}}
+                @if($appointment->patient)
+                    @php($pt = $appointment->patient)
+                    @if($pt->phone || $pt->phone_private || $pt->email_work || $pt->email_private || $pt->health_insurance)
+                        <div>
+                            <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--nx-faint)] mb-2">Kontakt</h3>
+                            <div class="text-sm text-[color:var(--nx-text)] space-y-0.5">
+                                @if($pt->phone || $pt->phone_private)<div>{{ $pt->phone ?: $pt->phone_private }}</div>@endif
+                                @if($pt->email_work || $pt->email_private)<div class="truncate">{{ $pt->email_work ?: $pt->email_private }}</div>@endif
+                            </div>
+                            @if($pt->health_insurance)
+                                <div class="text-xs text-[color:var(--nx-muted)] mt-1">KV: {{ $pt->health_insurance }}</div>
+                            @endif
+                        </div>
+                    @endif
+                @endif
+
+                {{-- Beschäftigung --}}
                 @if($ctxEmployment)
                     <div>
                         <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--nx-faint)] mb-2">Beschäftigung</h3>
                         <div class="text-sm text-[color:var(--nx-text)]">{{ $ctxEmployment->organizationEntity->name ?? '—' }}</div>
-                        @if($ctxEmployment->position)
-                            <div class="text-xs text-[color:var(--nx-muted)]">{{ $ctxEmployment->position }}</div>
+                        <div class="text-xs text-[color:var(--nx-muted)] space-y-0.5 mt-0.5">
+                            @if($ctxEmployment->position)<div>{{ $ctxEmployment->position }}</div>@endif
+                            @if($ctxEmployment->personnel_number)<div>Pers-Nr. {{ $ctxEmployment->personnel_number }}</div>@endif
+                            @if($ctxEmployment->started_at)<div>beschäftigt seit {{ \Illuminate\Support\Carbon::parse($ctxEmployment->started_at)->format('m.Y') }}</div>@endif
+                        </div>
+                        @if($ctxEmployment->first_aider)
+                            <div class="mt-1"><x-nx-badge variant="success" dot>Ersthelfer</x-nx-badge></div>
                         @endif
                     </div>
                 @endif
@@ -278,6 +305,14 @@
                        class="flex items-center justify-center gap-2 w-full rounded-md border border-[color:var(--nx-line)] px-3 py-2 text-sm font-medium text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)] transition-colors">
                         @svg('heroicon-o-folder-open', 'w-4 h-4') Volle Akte öffnen
                     </a>
+                @endif
+
+                {{-- Gefährdung (arbeitsmedizinisch relevant) --}}
+                @if($ctxEmployment && $ctxEmployment->risk)
+                    <div>
+                        <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--nx-faint)] mb-2">Gefährdung</h3>
+                        <div class="text-sm text-[color:var(--nx-text)]">{{ $ctxEmployment->risk }}</div>
+                    </div>
                 @endif
 
                 {{-- Fällige / offene Vorsorgen — die Handlungspunkte --}}
@@ -297,6 +332,26 @@
                                     @else
                                         <span class="text-xs text-[color:var(--nx-faint)] shrink-0">offen</span>
                                     @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+
+                {{-- Bescheinigungen (Metadaten — keine Befunde, Schweigepflicht) --}}
+                <div>
+                    <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--nx-faint)] mb-3">Bescheinigungen</h3>
+                    @if($ctxCertificates->isEmpty())
+                        <div class="text-sm text-[color:var(--nx-muted)]">Keine Bescheinigungen.</div>
+                    @else
+                        <ul class="space-y-1">
+                            @foreach($ctxCertificates as $c)
+                                <li>
+                                    <a href="{{ route('encounter.certificates.show', $c->id) }}" wire:navigate
+                                       class="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 -mx-2 hover:bg-[color:var(--nx-hover)] transition-colors">
+                                        <span class="text-sm text-[color:var(--nx-text)]">Bescheinigung</span>
+                                        <span class="text-xs text-[color:var(--nx-faint)] tabular-nums">{{ optional($c->created_at)->format('d.m.Y') }}</span>
+                                    </a>
                                 </li>
                             @endforeach
                         </ul>

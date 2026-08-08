@@ -352,10 +352,21 @@ class Show extends Component
             }
         }
 
+        // Letzte Bescheinigungen des Patienten (Metadaten — keine Befunde, Schweigepflicht).
+        $certificates = collect();
+        if ($patientId) {
+            try {
+                $certificates = \Platform\Encounter\Models\Certificate::query()->forTeam($team)
+                    ->where('patient_id', $patientId)->latest()->limit(4)->get();
+            } catch (\Throwable $e) {
+            }
+        }
+
         return [
-            'ctxProvisions' => $provisions,
-            'ctxEmployment' => $employment,
-            'ctxRecent'     => $recent,
+            'ctxProvisions'   => $provisions,
+            'ctxEmployment'   => $employment,
+            'ctxRecent'       => $recent,
+            'ctxCertificates' => $certificates,
         ];
     }
 }
