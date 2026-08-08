@@ -59,6 +59,14 @@ class Show extends Component
         $this->date = now()->toDateString();
     }
 
+    /** Tag aus dem Tages-Navigator wählen. */
+    public function selectDay(string $date): void
+    {
+        if ($this->isValidDate($date)) {
+            $this->date = $date;
+        }
+    }
+
     /** Termin wählen → rechts die Akte des zugehörigen Patienten laden. */
     public function selectAppointment(int $appointmentId): void
     {
@@ -124,15 +132,34 @@ class Show extends Component
 
         $appointments = $q->orderBy('scheduled_at')->get();
 
-        // Filter-Chips (nur wenn Ärzte gepflegt sind).
-        $doctorChips = [];
-        if (!empty($doctorLabels)) {
-            $doctorChips[] = ['key' => 'mine', 'label' => 'Meine', 'color' => null];
-            foreach ($doctorLabels as $id => $label) {
-                $doctorChips[] = ['key' => (string) $id, 'label' => $label, 'color' => \Platform\Encounter\Support\Doctors::color((int) $id)];
-            }
-            $doctorChips[] = ['key' => 'all', 'label' => 'Alle', 'color' => null];
+        // Tages-Navigator mit Count-Badges: kommende Arbeitstage (respektiert Meine/Alle-Filter).
+        $today       = now()->toDateString();
+        $windowStart = Carbon::parse($today)->subDays(2)->startOfDay();
+        $windowEnd   = Carbon::parse($today)->addDays(20)->endOfDay();
+
+        $countsQ = AppointmentModel::query()->forTeam($team)
+            ->whereBetween('scheduled_at', [$windowStart, $windowEnd]);
+        if ($activeDoctorFilter) {
+            $countsQ->where('doctor_entity_id', $activeDoctorFilter);
         }
+        $countsByDay = $countsQ->selectRaw('DATE(scheduled_at) as d, COUNT(*) as c')
+            ->groupBy('d')->pluck('c', 'd');
+
+        // Tage mit Terminen + heute + gewählter Tag, aufsteigend.
+        $dayStrip = collect($countsByDay->keys())
+            ->push($today)->push($this->date)
+            ->filter()->unique()->sort()->values()
+            ->map(function ($ds) use ($countsByDay, $today) {
+                $c = Carbon::parse($ds);
+                return [
+                    'date'     => $ds,
+                    'weekday'  => ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'][$c->dayOfWeek],
+                    'day'      => $c->format('d.m.'),
+                    'count'    => (int) ($countsByDay[$ds] ?? 0),
+                    'isToday'  => $ds === $today,
+                    'isActive' => $ds === $this->date,
+                ];
+            })->all();
 
         $patient       = null;
         $grouped       = [];
@@ -166,8 +193,9 @@ class Show extends Component
             'patient'       => $patient,
             'grouped'       => $grouped,
             'dueProvisions' => $dueProvisions,
-            'doctorChips'   => $doctorChips,
+            'dayStrip'      => $dayStrip,
             'doctorLabels'  => $doctorLabels,
+            'hasDoctors'    => !empty($doctorLabels),
             'hasMyDoctor'   => (bool) $myDoctorId,
         ])->layout('platform::layouts.app');
     }

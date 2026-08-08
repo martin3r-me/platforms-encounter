@@ -15,11 +15,11 @@
             ['label' => 'Sprechstunde', 'route' => 'encounter.cockpit', 'icon' => 'calendar-days'],
             $patient ? ['label' => $patient->getDisplayName() ?? '—'] : null,
         ]))">
-            <div class="flex items-center gap-1">
-                <x-nx-button variant="ghost" size="sm" wire:click="goPrev">@svg('heroicon-o-chevron-left', 'w-4 h-4')</x-nx-button>
-                <x-nx-button variant="secondary" size="sm" wire:click="goToday">Heute</x-nx-button>
-                <x-nx-button variant="ghost" size="sm" wire:click="goNext">@svg('heroicon-o-chevron-right', 'w-4 h-4')</x-nx-button>
-            </div>
+            @unless($isToday)
+                <x-nx-button variant="secondary" size="sm" wire:click="goToday">
+                    @svg('heroicon-o-calendar-days', 'w-4 h-4') Heute
+                </x-nx-button>
+            @endunless
             @if($patient)
                 <x-nx-button variant="secondary" size="sm" :href="route('patient.patients.show', $patient->id)" wire:navigate>
                     @svg('heroicon-o-identification', 'w-4 h-4')
@@ -215,31 +215,48 @@
         @endif
     </x-ui-page-container>
 
-    {{-- Innere Sidebar: Tages-Agenda (Termin wählen → Akte laden) --}}
+    {{-- Innere Sidebar: Tages-Navigator (mit Counts) + Agenda des gewählten Tages --}}
     <x-slot name="sidebar">
         <x-ui-page-sidebar title="Agenda" icon="heroicon-o-calendar-days" width="w-80" :defaultOpen="true">
-            <div class="p-3">
-                <div class="px-1 pb-2">
-                    <div class="text-sm font-medium text-[color:var(--nx-text)]">{{ $weekdays[$day->dayOfWeek] }}, {{ $day->format('d.m.Y') }}</div>
-                    <div class="text-xs text-[color:var(--nx-muted)]">{{ $isToday ? 'Heute' : '' }} · {{ $appointments->count() }} Termine</div>
-                </div>
+            {{-- Tages-Navigator: kommende Arbeitstage mit Anzahl meiner Termine --}}
+            <div class="px-2 pt-2 pb-2 space-y-px border-b border-[color:var(--nx-line)]">
+                @foreach($dayStrip as $d)
+                    <button type="button" wire:click="selectDay('{{ $d['date'] }}')" wire:key="day-{{ $d['date'] }}"
+                            @class([
+                                'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-colors',
+                                'bg-[color:var(--nx-active)]' => $d['isActive'],
+                                'hover:bg-[color:var(--nx-hover)]' => !$d['isActive'],
+                            ])>
+                        <span @class([
+                            'w-7 shrink-0 text-xs font-semibold',
+                            'text-[color:var(--nx-accent)]' => $d['isToday'],
+                            'text-[color:var(--nx-muted)]' => !$d['isToday'],
+                        ])>{{ $d['weekday'] }}</span>
+                        <span @class([
+                            'flex-1 text-sm tabular-nums',
+                            'font-semibold text-[color:var(--nx-text)]' => $d['isActive'],
+                            'text-[color:var(--nx-text)]' => !$d['isActive'],
+                        ])>{{ $d['day'] }}@if($d['isToday'])<span class="text-xs text-[color:var(--nx-faint)]"> · heute</span>@endif</span>
+                        @if($d['count'] > 0)
+                            <span class="shrink-0 min-w-[1.25rem] text-center text-[11px] leading-none px-1.5 py-0.5 rounded-full {{ $d['isActive'] ? 'bg-[color:var(--nx-surface)]' : 'bg-[color:var(--nx-bg)]' }} text-[color:var(--nx-muted)]">{{ $d['count'] }}</span>
+                        @endif
+                    </button>
+                @endforeach
+            </div>
 
-                {{-- Behandler-Filter --}}
-                @if(!empty($doctorChips))
-                    <div class="flex flex-wrap gap-1 px-1 pb-2">
-                        @foreach($doctorChips as $chip)
-                            <button type="button" wire:click="$set('doc', @js($chip['key']))"
-                                    @class([
-                                        'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors',
-                                        'border-[color:var(--nx-text)] bg-[color:var(--nx-active)] text-[color:var(--nx-text)]' => $doc === $chip['key'],
-                                        'border-[color:var(--nx-line)] text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]' => $doc !== $chip['key'],
-                                    ])>
-                                @if($chip['color'])<span class="w-2 h-2 rounded-full" style="background: {{ $chip['color'] }}"></span>@endif
-                                {{ $chip['label'] }}
-                            </button>
-                        @endforeach
+            <div class="p-3">
+                {{-- Meine / Alle (Default: nur meine) --}}
+                @if($hasDoctors)
+                    <div class="flex items-center justify-between px-1 pb-2">
+                        <div class="inline-flex rounded-md border border-[color:var(--nx-line)] overflow-hidden text-xs">
+                            <button type="button" wire:click="$set('doc','mine')"
+                                    @class(['px-2.5 py-1', 'bg-[color:var(--nx-active)] font-semibold text-[color:var(--nx-text)]' => $doc !== 'all', 'text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]' => $doc === 'all'])>Meine</button>
+                            <button type="button" wire:click="$set('doc','all')"
+                                    @class(['px-2.5 py-1 border-l border-[color:var(--nx-line)]', 'bg-[color:var(--nx-active)] font-semibold text-[color:var(--nx-text)]' => $doc === 'all', 'text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]' => $doc !== 'all'])>Alle</button>
+                        </div>
+                        <span class="text-xs text-[color:var(--nx-faint)]">{{ $appointments->count() }} {{ $appointments->count() === 1 ? 'Termin' : 'Termine' }}</span>
                     </div>
-                    @if($doc === 'mine' && !$hasMyDoctor)
+                    @if($doc !== 'all' && !$hasMyDoctor)
                         <div class="px-1 pb-2 text-xs text-[color:var(--nx-faint)]">Kein Arzt mit dir verknüpft — zeige alle. (Praxis → Ärzte → „Das bin ich")</div>
                     @endif
                 @endif
@@ -256,7 +273,6 @@
                                         'hover:bg-[color:var(--nx-hover)]' => $selectedAppointmentId !== $appointment->id,
                                         'bg-[color:var(--nx-active)]' => $selectedAppointmentId === $appointment->id,
                                     ])>
-                                {{-- Behandler-Farbpunkt --}}
                                 <span class="w-1.5 h-8 shrink-0 rounded-full" style="background: {{ $docId ? \Platform\Encounter\Support\Doctors::color((int)$docId) : 'transparent' }}"></span>
                                 <span class="w-11 shrink-0 text-sm font-medium text-[color:var(--nx-text)] tabular-nums">
                                     {{ optional($appointment->scheduled_at)->format('H:i') }}
@@ -269,7 +285,7 @@
                                                 @svg($lt->icon(), 'w-3.5 h-3.5') {{ $lt->label() }}
                                             </span>
                                         @endif
-                                        @if($docId && !empty($doctorLabels[$docId]))
+                                        @if($doc === 'all' && $docId && !empty($doctorLabels[$docId]))
                                             <span class="text-xs text-[color:var(--nx-faint)] truncate">· {{ $doctorLabels[$docId] }}</span>
                                         @endif
                                     </span>
