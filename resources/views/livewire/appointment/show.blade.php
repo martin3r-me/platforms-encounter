@@ -32,6 +32,19 @@
     </x-slot>
 
     <x-ui-page-container width="contained" spacing="space-y-6">
+        {{-- Vermengungs-Konflikt (z.B. Vorsorge + Eignung) --}}
+        @if($combinationConflict)
+            <div class="rounded-lg border border-[#e0b878] bg-[#fbf1e0] px-4 py-3 text-sm text-[#7a4a12]">
+                <div class="flex items-start gap-2">
+                    @svg('heroicon-o-exclamation-triangle', 'w-5 h-5 shrink-0')
+                    <div>
+                        <span class="font-semibold">Vermengungs-Konflikt: {{ $combinationConflictText }}</span>
+                        <div class="mt-0.5 opacity-80">Diese Gruppen dürfen nach ArbMedVV nicht im selben Termin (oder auf einer Bescheinigung) geführt werden — bitte auf zwei separate Termine aufteilen.</div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         {{-- Termin --}}
         <x-nx-section icon="heroicon-o-calendar-days" title="Termin">
             <x-nx-card>

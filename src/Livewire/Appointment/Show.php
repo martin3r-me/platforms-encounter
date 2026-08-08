@@ -303,8 +303,24 @@ class Show extends Component
             }
         }
 
+        // Vermengungsgruppen-Konflikt (z.B. Vorsorge + Eignung): erbrachte Leistungen (examination)
+        // + gewählter Vorsorgeanlass (arbmedvv_occasion), geprüft über die Core-Registry (lose gekoppelt).
+        $combRefs = [];
+        foreach ($model->services as $s) {
+            if ($s->catalog_type === 'examination' && $s->catalog_id) {
+                $combRefs[] = ['type' => 'examination', 'id' => (int) $s->catalog_id];
+            }
+        }
+        if (ctype_digit($this->anamnesisOccasion)) {
+            $combRefs[] = ['type' => 'arbmedvv_occasion', 'id' => (int) $this->anamnesisOccasion];
+        }
+        $combGroups  = app(\Platform\Core\Support\CatalogCombinationRegistry::class)->groupsFor($combRefs);
+        $groupLabels = config('examinations.combination_groups', ['vorsorge' => 'Vorsorge', 'eignung' => 'Eignung']);
+
         return view('encounter::livewire.appointment.show', array_merge([
             'appointment'         => $model,
+            'combinationConflict'     => count($combGroups) > 1,
+            'combinationConflictText' => implode(' + ', array_map(fn ($g) => $groupLabels[$g] ?? $g, $combGroups)),
             'statusOptions'       => collect(AppointmentStatus::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
             'audienceOptions'     => collect(Audience::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
             'locationTypeOptions' => \Platform\Encounter\Support\LocationTypes::allowed((int) Auth::user()->currentTeam->id),
