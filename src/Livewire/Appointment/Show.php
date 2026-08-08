@@ -23,6 +23,7 @@ class Show extends Component
     public bool $showServiceModal = false;
     public array $serviceForm = [
         'title' => '',
+        'examination_id' => '',
         'result' => '',
         'interval_active' => false,
         'interval_months' => null,
@@ -138,7 +139,8 @@ class Show extends Component
     public function addService(): void
     {
         $this->validate([
-            'serviceForm.title'           => ['required', 'string', 'max:255'],
+            'serviceForm.title'           => ['nullable', 'string', 'max:255'],
+            'serviceForm.examination_id'  => ['nullable'],
             'serviceForm.result'          => ['nullable', 'string', 'max:255'],
             'serviceForm.interval_months' => ['nullable', 'integer', 'min:1', 'max:120'],
         ]);
@@ -153,9 +155,23 @@ class Show extends Component
             $nextDue = $appointment->scheduled_at->copy()->addMonths((int) $intervalMonths)->startOfDay();
         }
 
+        // Untersuchungs-Katalog-Bindung (roter Faden: Leistung → examinations-Eintrag).
+        $examId = ctype_digit((string) ($this->serviceForm['examination_id'] ?? '')) ? (int) $this->serviceForm['examination_id'] : null;
+        $title  = trim((string) $this->serviceForm['title']);
+        if ($title === '' && $examId && class_exists(\Platform\Examinations\Models\Examination::class)) {
+            $exam = \Platform\Examinations\Models\Examination::query()->forTeam((int) $appointment->team_id)->find($examId);
+            $title = $exam?->label() ?? '';
+        }
+        if ($title === '') {
+            $this->addError('serviceForm.title', 'Titel oder Untersuchung wählen.');
+            return;
+        }
+
         ServiceModel::create([
             'appointment_id'  => $appointment->id,
-            'title'           => trim((string) $this->serviceForm['title']),
+            'catalog_type'    => $examId ? 'examination' : null,
+            'catalog_id'      => $examId,
+            'title'           => $title,
             'result'          => $this->serviceForm['result'] ?: null,
             'interval_active' => $intervalActive,
             'interval_months' => $intervalMonths,
@@ -210,6 +226,27 @@ class Show extends Component
             })
             ->orderBy('section')->orderBy('position')->orderBy('id')
             ->get();
+    }
+
+    /**
+     * Untersuchungs-Katalog (examinations) für die Leistungs-Bindung — guarded.
+     * @return array<int,string> [examination_id => label]
+     */
+    protected function examinationOptions(int $team): array
+    {
+        if (!class_exists(\Platform\Examinations\Models\Examination::class)) {
+            return [];
+        }
+        try {
+            $out = [];
+            foreach (\Platform\Examinations\Models\Examination::query()->forTeam($team)->active()
+                        ->orderBy('number')->orderBy('title')->get() as $e) {
+                $out[(int) $e->id] = $e->label();
+            }
+            return $out;
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     /** Anamnese des Termins speichern (updateOrCreate je Termin). */
@@ -275,6 +312,7 @@ class Show extends Component
             'doctorOptions'       => \Platform\Encounter\Support\Doctors::options((int) Auth::user()->currentTeam->id),
             'occasionOptions'     => $occasionOptions,
             'anamnesisQuestions'  => $this->relevantQuestions($team),
+            'examinationOptions'  => $this->examinationOptions($team),
         ])->layout('platform::layouts.app');
     }
 }

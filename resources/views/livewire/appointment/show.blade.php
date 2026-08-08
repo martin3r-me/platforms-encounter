@@ -167,7 +167,12 @@
                         <x-nx-table-body>
                             @foreach($appointment->services as $service)
                                 <x-nx-table-row wire:key="svc-{{ $service->id }}">
-                                    <x-nx-table-cell>{{ $service->title }}</x-nx-table-cell>
+                                    <x-nx-table-cell>
+                                        {{ $service->title }}
+                                        @if($service->catalog_type === 'examination')
+                                            <x-nx-badge variant="info" size="xs">Katalog</x-nx-badge>
+                                        @endif
+                                    </x-nx-table-cell>
                                     <x-nx-table-cell>{{ $service->result ?? '—' }}</x-nx-table-cell>
                                     <x-nx-table-cell>
                                         @if($service->next_due)
@@ -257,7 +262,22 @@
     <x-nx-modal wire:model="showServiceModal" size="md">
         <x-slot name="header">Leistung erfassen</x-slot>
         <div class="space-y-4">
-            <x-nx-input-text name="serviceForm.title" label="Leistung" wire:model="serviceForm.title" required />
+            {{-- Untersuchungs-Katalog (examinations) — bindet die Leistung an einen DGUV-Grundsatz --}}
+            @if(!empty($examinationOptions))
+                <div>
+                    <label class="block text-sm mb-1 text-[color:var(--nx-text)]">Untersuchung (Katalog)</label>
+                    <select wire:model="serviceForm.examination_id"
+                            class="block w-full rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-3 py-1.5 text-[color:var(--nx-text)]">
+                        <option value="">— frei (keine Katalog-Untersuchung) —</option>
+                        @foreach($examinationOptions as $eid => $elabel)
+                            <option value="{{ $eid }}">{{ $elabel }}</option>
+                        @endforeach
+                    </select>
+                    <p class="text-xs text-[color:var(--nx-faint)] mt-1">Katalog-Untersuchung wählen (füllt den Titel) oder unten frei eintragen.</p>
+                </div>
+            @endif
+            <x-nx-input-text name="serviceForm.title" label="Leistung / Titel" wire:model="serviceForm.title"
+                             hint="Optional, wenn oben eine Katalog-Untersuchung gewählt ist." />
             <x-nx-input-text name="serviceForm.result" label="Ergebnis" wire:model="serviceForm.result" />
             <x-nx-input-checkbox name="serviceForm.interval_active" label="Wiedervorlage (Recall)" wire:model.live="serviceForm.interval_active" />
             <x-nx-input-number name="serviceForm.interval_months" label="Intervall (Monate)" wire:model="serviceForm.interval_months"
