@@ -189,6 +189,52 @@ class Show extends Component
         $appointment->services()->where('id', $serviceId)->delete();
     }
 
+    /**
+     * Produkt-Bündel (examinations) übernehmen: je enthaltener Untersuchung eine Leistung anlegen.
+     * Bereits erfasste Untersuchungen werden übersprungen (kein Doppeln). Guarded — Modul optional.
+     * Die Vermengungsgruppen-Prüfung bleibt lose (Banner in render(); harter Block erst bei Bescheinigung).
+     */
+    public function addBundle(int $bundleId): void
+    {
+        if (!class_exists(\Platform\Examinations\Models\ExaminationBundle::class)) {
+            return;
+        }
+
+        $appointment = $this->resolve($this->appointmentId);
+        $team        = (int) $appointment->team_id;
+
+        $bundle = \Platform\Examinations\Models\ExaminationBundle::query()->forTeam($team)
+            ->with('examinations')->find($bundleId);
+        if (!$bundle) {
+            return;
+        }
+
+        $existingIds = $appointment->services()
+            ->where('catalog_type', 'examination')->pluck('catalog_id')
+            ->filter()->map(fn ($v) => (int) $v)->all();
+
+        $added = 0;
+        foreach ($bundle->examinations as $exam) {
+            if (in_array((int) $exam->id, $existingIds, true)) {
+                continue; // schon erfasst — nicht doppeln
+            }
+            ServiceModel::create([
+                'appointment_id' => $appointment->id,
+                'catalog_type'   => 'examination',
+                'catalog_id'     => (int) $exam->id,
+                'title'          => $exam->label(),
+            ]);
+            $existingIds[] = (int) $exam->id;
+            $added++;
+        }
+
+        $this->dispatch('toast',
+            message: $added > 0
+                ? "Bündel „{$bundle->name}“ übernommen ({$added} Leistung(en))."
+                : 'Alle Leistungen dieses Bündels sind bereits erfasst.',
+            type: $added > 0 ? 'success' : 'info');
+    }
+
     public function issueCertificate()
     {
         $audience = Audience::tryFrom($this->certAudience);
@@ -246,6 +292,30 @@ class Show extends Component
             foreach (\Platform\Examinations\Models\Examination::query()->forTeam($team)->active()
                         ->orderBy('number')->orderBy('title')->get() as $e) {
                 $out[(int) $e->id] = $e->label();
+            }
+            return $out;
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Produkt-Bündel (examinations) für den Schnell-Übernehmen-Picker — guarded, nur nicht-leere aktive.
+     * @return array<int,string> [bundle_id => "Name (n)"]
+     */
+    protected function bundleOptions(int $team): array
+    {
+        if (!class_exists(\Platform\Examinations\Models\ExaminationBundle::class)) {
+            return [];
+        }
+        try {
+            $out = [];
+            foreach (\Platform\Examinations\Models\ExaminationBundle::query()->forTeam($team)
+                        ->where('status', 'active')->withCount('examinations')
+                        ->orderBy('name')->get() as $b) {
+                if ($b->examinations_count > 0) {
+                    $out[(int) $b->id] = $b->name.' ('.$b->examinations_count.')';
+                }
             }
             return $out;
         } catch (\Throwable $e) {
@@ -333,6 +403,7 @@ class Show extends Component
             'occasionOptions'     => $occasionOptions,
             'anamnesisQuestions'  => $this->relevantQuestions($team),
             'examinationOptions'  => $this->examinationOptions($team),
+            'bundleOptions'       => $this->bundleOptions($team),
         ], $this->patientContext($model, $team)))->layout('platform::layouts.app');
     }
 

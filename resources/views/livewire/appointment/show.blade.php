@@ -169,9 +169,22 @@
         <x-nx-section icon="heroicon-o-clipboard-document-check" title="Erbrachte Leistungen"
                       :hint="$appointment->services->count()">
             <x-slot name="action">
-                <x-nx-button variant="secondary" size="sm" wire:click="$set('showServiceModal', true)">
-                    @svg('heroicon-o-plus', 'w-4 h-4') Leistung erfassen
-                </x-nx-button>
+                <div class="flex items-center gap-2">
+                    @if(!empty($bundleOptions))
+                        {{-- Produkt-Bündel als Paket übernehmen (legt je enthaltener Untersuchung eine Leistung an) --}}
+                        <select
+                            class="text-sm rounded-[var(--nx-radius,8px)] border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-[color:var(--nx-text)] px-2 py-1.5"
+                            x-on:change="if ($event.target.value) { $wire.addBundle($event.target.value); $event.target.value=''; }">
+                            <option value="">Bündel übernehmen …</option>
+                            @foreach($bundleOptions as $bid => $blabel)
+                                <option value="{{ $bid }}">{{ $blabel }}</option>
+                            @endforeach
+                        </select>
+                    @endif
+                    <x-nx-button variant="secondary" size="sm" wire:click="$set('showServiceModal', true)">
+                        @svg('heroicon-o-plus', 'w-4 h-4') Leistung erfassen
+                    </x-nx-button>
+                </div>
             </x-slot>
             @if($appointment->services->isEmpty())
                 <x-nx-card>
