@@ -15,6 +15,10 @@
             ['label' => 'Bescheinigungen', 'route' => 'encounter.certificates.index', 'icon' => 'document-check'],
             ['label' => $certificate->title],
         ]">
+            <x-nx-button variant="primary" size="sm" :href="route('encounter.certificates.pdf', $certificate)" target="_blank">
+                @svg('heroicon-o-printer', 'w-4 h-4')
+                <span>PDF / Drucken</span>
+            </x-nx-button>
             <x-nx-button variant="secondary" size="sm" wire:click="$set('showDeliveryModal', true)">
                 @svg('heroicon-o-paper-airplane', 'w-4 h-4')
                 <span>Zustellung erfassen</span>

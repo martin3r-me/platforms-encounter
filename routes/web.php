@@ -9,6 +9,7 @@ use Platform\Encounter\Livewire\Certificate\Show as CertificateShow;
 use Platform\Encounter\Livewire\Settings\Index as SettingsIndex;
 use Platform\Encounter\Livewire\Record\Show as RecordShow;
 use Platform\Encounter\Livewire\Anamnesis\History as AnamnesisHistoryView;
+use Platform\Encounter\Http\Controllers\CertificatePdfController;
 
 /*
  * Encounter (Modul-Titel „Akte") — Web-Routes (Prefix 'encounter' aus config).
@@ -23,4 +24,5 @@ Route::get('/appointments', AppointmentIndex::class)->name('encounter.appointmen
 Route::get('/appointments/{appointment}', AppointmentShow::class)->name('encounter.appointments.show');
 Route::get('/certificates', CertificateIndex::class)->name('encounter.certificates.index');
 Route::get('/certificates/{certificate}', CertificateShow::class)->name('encounter.certificates.show');
+Route::get('/certificates/{certificate}/pdf', CertificatePdfController::class)->name('encounter.certificates.pdf');
 Route::get('/settings', SettingsIndex::class)->name('encounter.settings');
