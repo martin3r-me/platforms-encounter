@@ -22,6 +22,10 @@ class Show extends Component
     #[Url(as: 't')]
     public string $tab = 'verlauf';
 
+    /** Herkunfts-Betrieb (organization_entity_id) für die Zurück-Brotkrume zur Vorsorgekartei. */
+    #[Url(as: 'ret_company')]
+    public ?int $retCompany = null;
+
     public function mount(int $patient): void
     {
         $this->patientId = $this->resolvePatient($patient)->id;
@@ -80,6 +84,29 @@ class Show extends Component
         } catch (\Throwable $e) {
         }
 
+        // Zurück-Brotkrume zur Vorsorgekartei — sicher: nur eine Betrieb-ID, serverseitig
+        // team-scoped aufgelöst und zur festen Route gebaut (kein beliebiges URL-Query).
+        $backCrumb = null;
+        if ($this->retCompany
+            && \Illuminate\Support\Facades\Route::has('customer.companies.vorsorge')
+            && class_exists(\Platform\Organization\Models\OrganizationEntity::class)) {
+            try {
+                $company = \Platform\Organization\Models\OrganizationEntity::query()
+                    ->where('team_id', $team)->find($this->retCompany);
+                if ($company) {
+                    $backCrumb = [
+                        'label'         => $company->name . ' · Vorsorgekartei',
+                        'route'         => 'customer.companies.vorsorge',
+                        'params'        => [$company->id],
+                        'icon'          => 'shield-check',
+                        'wire:navigate' => true,
+                    ];
+                }
+            } catch (\Throwable $e) {
+                // Organization/Customer nicht verfügbar — dann ohne Zurück-Brotkrume.
+            }
+        }
+
         return view('encounter::livewire.record.show', [
             'patient'       => $patient,
             'entries'       => $entries,
@@ -88,6 +115,7 @@ class Show extends Component
             'employments'   => $employments,
             'provisions'    => $provisions,
             'certificates'  => $certificates,
+            'backCrumb'     => $backCrumb,
         ])->layout('platform::layouts.app');
     }
 }

@@ -18,10 +18,11 @@
     </x-slot>
 
     <x-slot name="actionbar">
-        <x-ui-page-actionbar :breadcrumbs="[
+        <x-ui-page-actionbar :breadcrumbs="array_values(array_filter([
+            $backCrumb ?? null,
             ['label' => 'Akte', 'route' => 'encounter.cockpit', 'icon' => 'folder-open'],
             ['label' => $patient->getDisplayName() ?? '—'],
-        ]">
+        ]))">
             <x-nx-button variant="secondary" size="sm" :href="route('patient.patients.show', $patient->id)" wire:navigate>
                 @svg('heroicon-o-pencil-square', 'w-4 h-4')
                 <span>Stammdaten bearbeiten</span>
