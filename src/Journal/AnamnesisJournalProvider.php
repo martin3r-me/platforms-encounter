@@ -45,6 +45,7 @@ class AnamnesisJournalProvider implements JournalEntryProvider
         $entries = [];
         foreach ($anamneses as $a) {
             $answers = $a->answers ?? [];
+            $snap    = $a->questions_snapshot ?? [];   // Fragetext zum Antwortzeitpunkt
 
             $delta = $changes[$a->id] ?? [];
             $changedCount = 0;
@@ -52,7 +53,7 @@ class AnamnesisJournalProvider implements JournalEntryProvider
             $lines = [];
             foreach ($answers as $qid => $val) {
                 $qid   = (int) $qid;
-                $label = $questionText[$qid] ?? ('Frage #' . $qid);
+                $label = $snap[$qid] ?? $questionText[$qid] ?? ('Frage #' . $qid);
                 $value = is_scalar($val) ? (string) $val : json_encode($val);
 
                 // Delta-Marker: neu / geändert ggü. letztem Kontakt.

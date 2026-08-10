@@ -48,12 +48,19 @@ class AnamnesisHistory
         $values   = [];
         $changes  = [];
         $usedQuestionIds = [];
+        $snapshotText = []; // question_id => Fragetext (Snapshot, jüngster gewinnt)
         $lastSeen = [];   // question_id => zuletzt bekannter Wert
 
         foreach ($anamneses as $a) {
             $answers = $a->answers ?? [];
             $values[$a->id]  = [];
             $changes[$a->id] = [];
+
+            foreach (($a->questions_snapshot ?? []) as $sqid => $stext) {
+                if ($stext !== null && $stext !== '') {
+                    $snapshotText[(int) $sqid] = $stext;
+                }
+            }
 
             foreach ($answers as $qid => $val) {
                 $qid = (int) $qid;
@@ -83,7 +90,7 @@ class AnamnesisHistory
         // Nur tatsächlich verwendete Fragen, in stabiler Reihenfolge.
         $questions = [];
         foreach (array_keys($usedQuestionIds) as $qid) {
-            $questions[$qid] = $questionText[$qid] ?? ('Frage #' . $qid);
+            $questions[$qid] = $snapshotText[$qid] ?? $questionText[$qid] ?? ('Frage #' . $qid);
         }
 
         // Kontakte neueste zuerst für die Anzeige.

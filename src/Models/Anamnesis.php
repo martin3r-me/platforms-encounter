@@ -28,6 +28,7 @@ class Anamnesis extends Model
         'catalog_type',
         'catalog_id',
         'answers',
+        'questions_snapshot',
         'free_text',
         'version',
         'created_by_user_id',
@@ -35,9 +36,10 @@ class Anamnesis extends Model
 
     protected $casts = [
         // Schweigepflicht: klinischer Inhalt at-rest verschlüsselt.
-        'answers'   => 'encrypted:array',
-        'free_text' => 'encrypted',
-        'version'   => 'integer',
+        'answers'            => 'encrypted:array',
+        'questions_snapshot' => 'encrypted:array',   // {question_id: Fragetext zum Antwortzeitpunkt}
+        'free_text'          => 'encrypted',
+        'version'            => 'integer',
     ];
 
     protected static function booted(): void

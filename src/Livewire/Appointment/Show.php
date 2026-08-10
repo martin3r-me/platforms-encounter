@@ -332,11 +332,18 @@ class Show extends Component
         $occasionId = ctype_digit($this->anamnesisOccasion) ? (int) $this->anamnesisOccasion : null;
 
         // Nur Antworten auf tatsächlich relevante Fragen persistieren.
-        $validIds = $this->relevantQuestions($team)->pluck('id')->all();
+        // Zusätzlich den Fragetext ZUM ANTWORTZEITPUNKT snapshotten (robust gegen spätere
+        // Katalog-Änderungen).
+        $relevant = $this->relevantQuestions($team);
+        $validIds = $relevant->pluck('id')->all();
+        $textById = $relevant->pluck('text', 'id')->all();
         $answers  = [];
+        $snapshot = [];
         foreach ($this->anamnesisAnswers as $qid => $val) {
-            if (in_array((int) $qid, $validIds, true) && $val !== '' && $val !== null) {
-                $answers[(int) $qid] = $val;
+            $qid = (int) $qid;
+            if (in_array($qid, $validIds, true) && $val !== '' && $val !== null) {
+                $answers[$qid]  = $val;
+                $snapshot[$qid] = $textById[$qid] ?? null;
             }
         }
 
@@ -345,11 +352,12 @@ class Show extends Component
             : null;
 
         $data = [
-            'patient_id'   => $model->patient_id,
-            'catalog_type' => $occasionId ? 'arbmedvv_occasion' : null,
-            'catalog_id'   => $occasionId,
-            'answers'      => $answers,
-            'free_text'    => $this->anamnesisFreeText ?: null,
+            'patient_id'         => $model->patient_id,
+            'catalog_type'       => $occasionId ? 'arbmedvv_occasion' : null,
+            'catalog_id'         => $occasionId,
+            'answers'            => $answers,
+            'questions_snapshot' => $snapshot,
+            'free_text'          => $this->anamnesisFreeText ?: null,
         ];
 
         if ($anamnesis) {
