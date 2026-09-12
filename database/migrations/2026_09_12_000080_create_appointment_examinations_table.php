@@ -13,6 +13,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('encounter_appointment_examinations')) {
+            return; // idempotent: Tabelle wurde in einem früheren Lauf bereits angelegt
+        }
+
         Schema::create('encounter_appointment_examinations', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('appointment_id')->index();

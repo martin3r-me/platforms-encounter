@@ -18,6 +18,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasColumn('encounter_anamnesis_questions', 'persistence')) {
+            return; // idempotent
+        }
+
         Schema::table('encounter_anamnesis_questions', function (Blueprint $table) {
             $table->string('persistence', 16)->default('snapshot')->after('section');
         });

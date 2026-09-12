@@ -16,6 +16,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('encounter_patient_anamnesis_entries')) {
+            return; // idempotent
+        }
+
         Schema::create('encounter_patient_anamnesis_entries', function (Blueprint $table) {
             $table->id();
             $table->uuid('uuid')->unique();
