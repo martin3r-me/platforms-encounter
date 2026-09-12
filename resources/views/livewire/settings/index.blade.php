@@ -121,7 +121,7 @@
 
         {{-- Anamnese-Fragenkatalog --}}
         <x-nx-section icon="heroicon-o-clipboard-document-list" title="Anamnese-Fragenkatalog"
-                      description="Anlassabhängige Anamnese-Fragen (an ArbMedVV-Vorsorgeanlass gebunden) + untersucherabhängig."
+                      description="Fragen je Verfahren (DGUV-Grundsatz/Eignung/FeV) oder verfahrensunabhängig (Basis) + untersucherabhängig."
                       :hint="$questions->count()">
             <x-slot name="action">
                 <x-nx-button variant="secondary" size="sm" wire:click="openQuestionCreate">
@@ -137,7 +137,7 @@
                     <x-nx-table>
                         <x-nx-table-header>
                             <x-nx-table-header-cell>Frage</x-nx-table-header-cell>
-                            <x-nx-table-header-cell>Anlass</x-nx-table-header-cell>
+                            <x-nx-table-header-cell>Verfahren</x-nx-table-header-cell>
                             <x-nx-table-header-cell>Typ</x-nx-table-header-cell>
                             <x-nx-table-header-cell>Untersucher</x-nx-table-header-cell>
                             <x-nx-table-header-cell align="right"></x-nx-table-header-cell>
@@ -149,7 +149,13 @@
                                         {{ $q->text }}
                                         @if($q->section)<span class="ml-1 text-xs text-[color:var(--nx-faint)]">· {{ $q->section }}</span>@endif
                                     </x-nx-table-cell>
-                                    <x-nx-table-cell class="text-[color:var(--nx-muted)]">{{ $q->catalog?->title ?? 'allgemein' }}</x-nx-table-cell>
+                                    <x-nx-table-cell class="text-[color:var(--nx-muted)]">
+                                        @if($q->catalog)
+                                            {{ trim(($q->catalog->number ? $q->catalog->number.' · ' : '').($q->catalog->recommendation_name ?? $q->catalog->title)) }}
+                                        @else
+                                            Basis
+                                        @endif
+                                    </x-nx-table-cell>
                                     <x-nx-table-cell><x-nx-badge>{{ $q->type?->label() }}</x-nx-badge></x-nx-table-cell>
                                     <x-nx-table-cell class="text-[color:var(--nx-muted)]">{{ $q->examiner_scope ?: 'alle' }}</x-nx-table-cell>
                                     <x-nx-table-cell align="right">
@@ -268,7 +274,7 @@
             <x-nx-input-textarea name="questionForm.text" label="Frage" wire:model="questionForm.text" rows="2" />
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <x-nx-input-select name="questionForm.type" label="Antworttyp" wire:model="questionForm.type" :options="$questionTypeOptions" />
-                <x-nx-input-select name="questionForm.occasion_id" label="Vorsorgeanlass (ArbMedVV)" wire:model="questionForm.occasion_id" :options="$occasionOptions" />
+                <x-nx-input-select name="questionForm.examination_id" label="Verfahren (Untersuchung)" wire:model="questionForm.examination_id" :options="$examinationOptions" />
                 <x-nx-input-text name="questionForm.examiner_scope" label="Untersucher (leer = alle)" wire:model="questionForm.examiner_scope" placeholder="z.B. arzt / assistenz" />
                 <x-nx-input-text name="questionForm.section" label="Abschnitt (Gruppierung)" wire:model="questionForm.section" placeholder="z.B. Vorerkrankungen" />
                 <x-nx-input-text name="questionForm.position" type="number" label="Position" wire:model="questionForm.position" />

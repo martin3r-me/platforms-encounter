@@ -27,7 +27,7 @@ class Index extends Component
     // --- Anamnese-Fragenkatalog ---
     public bool $showQuestionModal = false;
     public ?int $editingQuestionId = null;
-    public array $questionForm = ['text' => '', 'type' => 'yes_no', 'occasion_id' => '', 'examiner_scope' => '', 'section' => '', 'position' => 0, 'active' => true];
+    public array $questionForm = ['text' => '', 'type' => 'yes_no', 'examination_id' => '', 'examiner_scope' => '', 'section' => '', 'position' => 0, 'active' => true];
 
     // --- Praxis-Profil ---
     public array $practiceForm = [
@@ -167,7 +167,7 @@ class Index extends Component
 
     public function openQuestionCreate(): void
     {
-        $this->questionForm = ['text' => '', 'type' => 'yes_no', 'occasion_id' => '', 'examiner_scope' => '', 'section' => '', 'position' => 0, 'active' => true];
+        $this->questionForm = ['text' => '', 'type' => 'yes_no', 'examination_id' => '', 'examiner_scope' => '', 'section' => '', 'position' => 0, 'active' => true];
         $this->editingQuestionId = null;
         $this->showQuestionModal = true;
     }
@@ -179,7 +179,7 @@ class Index extends Component
         $this->questionForm = [
             'text'           => $q->text,
             'type'           => $q->type?->value ?? 'yes_no',
-            'occasion_id'    => $q->catalog_type === 'arbmedvv_occasion' ? (string) $q->catalog_id : '',
+            'examination_id' => $q->catalog_type === 'examination' ? (string) $q->catalog_id : '',
             'examiner_scope' => $q->examiner_scope ?? '',
             'section'        => $q->section ?? '',
             'position'       => (int) $q->position,
@@ -193,27 +193,32 @@ class Index extends Component
         $data = $this->validate([
             'questionForm.text'           => ['required', 'string', 'max:1000'],
             'questionForm.type'           => ['required', 'string', 'in:yes_no,text,scale,choice'],
-            'questionForm.occasion_id'    => ['nullable', 'string', 'max:255'],
+            'questionForm.examination_id' => ['nullable', 'string', 'max:255'],
             'questionForm.examiner_scope' => ['nullable', 'string', 'max:24'],
             'questionForm.section'        => ['nullable', 'string', 'max:191'],
             'questionForm.position'       => ['nullable', 'integer'],
         ])['questionForm'];
 
-        // occasion_id kann ID ODER Titel sein (Select-Rendering) → zur ID auflösen.
-        $occasionId = $data['occasion_id'] ?: null;
-        if ($occasionId !== null && !ctype_digit((string) $occasionId)
-            && class_exists(\Platform\Arbmedvv\Models\Occasion::class)) {
-            $occasionId = \Platform\Arbmedvv\Models\Occasion::query()
-                ->where('team_id', $this->teamId())->where('title', $occasionId)->value('id');
+        // examination_id: Frage hängt am Verfahren. Leer = Basismodul (verfahrensunabhängig).
+        // Robust: ID ODER Bezeichnung (Titel/neue Empfehlung/Nummer) → zur ID auflösen.
+        $examId = $data['examination_id'] ?: null;
+        if ($examId !== null && !ctype_digit((string) $examId)
+            && class_exists(\Platform\Examinations\Models\Examination::class)) {
+            $examId = \Platform\Examinations\Models\Examination::query()
+                ->where('team_id', $this->teamId())
+                ->where(fn ($q) => $q->where('title', $examId)
+                    ->orWhere('recommendation_name', $examId)
+                    ->orWhere('number', $examId))
+                ->value('id');
         }
-        $occasionId = $occasionId ? (int) $occasionId : null;
+        $examId = $examId ? (int) $examId : null;
 
         $payload = [
             'team_id'            => $this->teamId(),
             'text'               => $data['text'],
             'type'               => $data['type'],
-            'catalog_type'       => $occasionId ? 'arbmedvv_occasion' : null,
-            'catalog_id'         => $occasionId,
+            'catalog_type'       => $examId ? 'examination' : null,
+            'catalog_id'         => $examId,
             'examiner_scope'     => $data['examiner_scope'] ?: null,
             'section'            => $data['section'] ?: null,
             'position'           => (int) ($data['position'] ?? 0),
@@ -256,11 +261,19 @@ class Index extends Component
     {
         $team = $this->teamId();
 
-        // Anlass-Katalog (arbmedvv) guarded.
-        $occasionOptions = ['' => '— allgemein (kein Anlass) —'];
-        if (class_exists(\Platform\Arbmedvv\Models\Occasion::class)) {
-            foreach (\Platform\Arbmedvv\Models\Occasion::query()->where('team_id', $team)->orderBy('title')->get() as $o) {
-                $occasionOptions[$o->id] = $o->title;
+        // Verfahren-Katalog (examinations) guarded — Fragen hängen am Verfahren.
+        $examinationOptions = ['' => '— Basis (kein Verfahren) —'];
+        if (class_exists(\Platform\Examinations\Models\Examination::class)) {
+            $kindLabels = ['vorsorge' => 'Vorsorge', 'eignung' => 'Eignung', 'fev' => 'FeV'];
+            $rows = \Platform\Examinations\Models\Examination::query()->where('team_id', $team)
+                ->where('status', 'active')
+                ->orderByRaw("FIELD(category_kind, 'vorsorge','eignung','fev')")
+                ->orderBy('number')->orderBy('title')->get();
+            foreach ($rows as $e) {
+                $name  = $e->recommendation_name ?: $e->title;
+                $label = ($e->number ? $e->number . ' · ' : '') . $name;
+                $kind  = $kindLabels[$e->category_kind] ?? $e->category_kind;
+                $examinationOptions[$e->id] = trim(($kind ? "[{$kind}] " : '') . $label);
             }
         }
 
@@ -271,7 +284,7 @@ class Index extends Component
             'audienceOptions' => collect(Audience::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
             'typeOptions'     => collect(FieldType::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
             'questionTypeOptions' => QuestionType::options(),
-            'occasionOptions'     => $occasionOptions,
+            'examinationOptions'  => $examinationOptions,
         ])->layout('platform::layouts.app');
     }
 }
