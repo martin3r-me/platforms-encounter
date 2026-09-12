@@ -265,15 +265,26 @@ class Show extends Component
     {
         $occasionId = ctype_digit($this->anamnesisOccasion) ? (int) $this->anamnesisOccasion : null;
 
-        // Anzeige folgt dem Select: konkreter Anlass -> nur dessen spezifische Fragen;
-        // "ohne Anlass" -> nur die allgemeinen Fragen. Kein Mischen (offensichtlicher für den Arzt).
+        // Fragen hängen am VERFAHREN: Anlass -> examination_id auflösen, dann dessen Fragen laden.
+        $examinationId = null;
+        if ($occasionId && class_exists(\Platform\Arbmedvv\Models\Occasion::class)) {
+            $examinationId = \Platform\Arbmedvv\Models\Occasion::query()
+                ->where('team_id', $team)->whereKey($occasionId)->value('examination_id');
+        }
+
+        // Vereinigung: Basismodul (catalog_type NULL) läuft IMMER mit; dazu die Verfahren-Fragen.
+        // Zusätzlich noch nicht umgehängte anlass-gebundene Fragen (Übergangs-Fallback).
         return AnamnesisQuestion::query()
             ->forTeam($team)->active()
-            ->when(
-                $occasionId,
-                fn ($q) => $q->where('catalog_type', 'arbmedvv_occasion')->where('catalog_id', $occasionId),
-                fn ($q) => $q->whereNull('catalog_type')
-            )
+            ->where(function ($q) use ($examinationId, $occasionId) {
+                $q->whereNull('catalog_type');
+                if ($examinationId) {
+                    $q->orWhere(fn ($w) => $w->where('catalog_type', 'examination')->where('catalog_id', $examinationId));
+                }
+                if ($occasionId) {
+                    $q->orWhere(fn ($w) => $w->where('catalog_type', 'arbmedvv_occasion')->where('catalog_id', $occasionId));
+                }
+            })
             ->orderBy('section')->orderBy('position')->orderBy('id')
             ->get();
     }
