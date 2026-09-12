@@ -117,8 +117,15 @@
                             Noch keine Fragen. Wähle ein Verfahren oder pflege den Fragenkatalog unter Praxis → Einstellungen.
                         </x-nx-empty>
                     @else
+                        @php($currentPersistence = null)
                         <div class="space-y-4">
                             @foreach($anamnesisQuestions as $q)
+                                @if($q->persistence !== $currentPersistence)
+                                    @php($currentPersistence = $q->persistence)
+                                    <div class="pt-2 text-xs font-semibold uppercase tracking-wide text-[color:var(--nx-faint)] border-b border-[color:var(--nx-line)] pb-1">
+                                        {{ $q->persistence === 'persistent' ? 'Dauerzustand (patientenweit)' : 'Momentaufnahme (dieser Termin)' }}
+                                    </div>
+                                @endif
                                 <div wire:key="anq-{{ $q->id }}">
                                     <label class="block text-sm mb-1 text-[color:var(--nx-text)]">
                                         {{ $q->text }}
@@ -219,7 +226,11 @@
                                             <x-nx-badge variant="info" size="xs">Katalog</x-nx-badge>
                                         @endif
                                     </x-nx-table-cell>
-                                    <x-nx-table-cell>{{ $service->result ?? '—' }}</x-nx-table-cell>
+                                    <x-nx-table-cell>
+                                        <input type="text" wire:model.blur="serviceResults.{{ $service->id }}"
+                                               placeholder="Ergebnis …"
+                                               class="block w-full rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-2 py-1 text-[color:var(--nx-text)]" />
+                                    </x-nx-table-cell>
                                     <x-nx-table-cell>
                                         @if($service->next_due)
                                             {{ $service->next_due->format('d.m.Y') }}

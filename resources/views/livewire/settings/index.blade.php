@@ -275,6 +275,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <x-nx-input-select name="questionForm.type" label="Antworttyp" wire:model="questionForm.type" :options="$questionTypeOptions" />
                 <x-nx-input-select name="questionForm.examination_id" label="Verfahren (Untersuchung)" wire:model="questionForm.examination_id" :options="$examinationOptions" />
+                <x-nx-input-select name="questionForm.persistence" label="Art" wire:model="questionForm.persistence" :options="$persistenceOptions" />
                 <x-nx-input-text name="questionForm.examiner_scope" label="Untersucher (leer = alle)" wire:model="questionForm.examiner_scope" placeholder="z.B. arzt / assistenz" />
                 <x-nx-input-text name="questionForm.section" label="Abschnitt (Gruppierung)" wire:model="questionForm.section" placeholder="z.B. Vorerkrankungen" />
                 <x-nx-input-text name="questionForm.position" type="number" label="Position" wire:model="questionForm.position" />

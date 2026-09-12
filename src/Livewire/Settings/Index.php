@@ -27,7 +27,7 @@ class Index extends Component
     // --- Anamnese-Fragenkatalog ---
     public bool $showQuestionModal = false;
     public ?int $editingQuestionId = null;
-    public array $questionForm = ['text' => '', 'type' => 'yes_no', 'examination_id' => '', 'examiner_scope' => '', 'section' => '', 'position' => 0, 'active' => true];
+    public array $questionForm = ['text' => '', 'type' => 'yes_no', 'examination_id' => '', 'persistence' => 'snapshot', 'examiner_scope' => '', 'section' => '', 'position' => 0, 'active' => true];
 
     // --- Praxis-Profil ---
     public array $practiceForm = [
@@ -167,7 +167,7 @@ class Index extends Component
 
     public function openQuestionCreate(): void
     {
-        $this->questionForm = ['text' => '', 'type' => 'yes_no', 'examination_id' => '', 'examiner_scope' => '', 'section' => '', 'position' => 0, 'active' => true];
+        $this->questionForm = ['text' => '', 'type' => 'yes_no', 'examination_id' => '', 'persistence' => 'snapshot', 'examiner_scope' => '', 'section' => '', 'position' => 0, 'active' => true];
         $this->editingQuestionId = null;
         $this->showQuestionModal = true;
     }
@@ -180,6 +180,7 @@ class Index extends Component
             'text'           => $q->text,
             'type'           => $q->type?->value ?? 'yes_no',
             'examination_id' => $q->catalog_type === 'examination' ? (string) $q->catalog_id : '',
+            'persistence'    => $q->persistence ?: 'snapshot',
             'examiner_scope' => $q->examiner_scope ?? '',
             'section'        => $q->section ?? '',
             'position'       => (int) $q->position,
@@ -194,6 +195,7 @@ class Index extends Component
             'questionForm.text'           => ['required', 'string', 'max:1000'],
             'questionForm.type'           => ['required', 'string', 'in:yes_no,text,scale,choice'],
             'questionForm.examination_id' => ['nullable', 'string', 'max:255'],
+            'questionForm.persistence'    => ['required', 'string', 'in:snapshot,persistent'],
             'questionForm.examiner_scope' => ['nullable', 'string', 'max:24'],
             'questionForm.section'        => ['nullable', 'string', 'max:191'],
             'questionForm.position'       => ['nullable', 'integer'],
@@ -219,6 +221,7 @@ class Index extends Component
             'type'               => $data['type'],
             'catalog_type'       => $examId ? 'examination' : null,
             'catalog_id'         => $examId,
+            'persistence'        => $data['persistence'] ?: 'snapshot',
             'examiner_scope'     => $data['examiner_scope'] ?: null,
             'section'            => $data['section'] ?: null,
             'position'           => (int) ($data['position'] ?? 0),
@@ -285,6 +288,7 @@ class Index extends Component
             'typeOptions'     => collect(FieldType::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
             'questionTypeOptions' => QuestionType::options(),
             'examinationOptions'  => $examinationOptions,
+            'persistenceOptions'  => ['snapshot' => 'Momentaufnahme (Vorgang)', 'persistent' => 'Dauerzustand (Patient)'],
         ])->layout('platform::layouts.app');
     }
 }

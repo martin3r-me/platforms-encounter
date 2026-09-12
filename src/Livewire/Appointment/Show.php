@@ -29,6 +29,9 @@ class Show extends Component
         'interval_months' => null,
     ];
 
+    /** Inline-Ergebnisse je Leistung: {service_id: result}. Speichert on-blur. */
+    public array $serviceResults = [];
+
     public bool $showCertModal = false;
     public string $certAudience = 'patient';
 
@@ -194,6 +197,14 @@ class Show extends Component
         $appointment->services()->where('id', $serviceId)->delete();
     }
 
+    /** Inline-Ergebnis einer Leistung on-blur speichern. */
+    public function updatedServiceResults($value, $key): void
+    {
+        $appointment = $this->resolve($this->appointmentId);
+        $appointment->services()->where('id', (int) $key)
+            ->update(['result' => ($value !== '' && $value !== null) ? (string) $value : null]);
+    }
+
     /**
      * Produkt-Bündel (examinations) übernehmen: je enthaltener Untersuchung eine Leistung anlegen.
      * Bereits erfasste Untersuchungen werden übersprungen (kein Doppeln). Guarded — Modul optional.
@@ -328,6 +339,7 @@ class Show extends Component
                     $q->orWhere(fn ($w) => $w->where('catalog_type', 'examination')->whereIn('catalog_id', $examIds));
                 }
             })
+            ->orderBy('persistence')  // 'persistent' vor 'snapshot' → Dauerzustand-Block zuerst
             ->orderBy('section')->orderBy('position')->orderBy('id')
             ->get();
     }
@@ -429,6 +441,13 @@ class Show extends Component
     {
         $model = $this->resolve($this->appointmentId)->load(['patient', 'services', 'certificates']);
         $team  = (int) $model->team_id;
+
+        // Inline-Ergebnisse vorbelegen (ohne bereits im Formular editierte Werte zu überschreiben).
+        foreach ($model->services as $s) {
+            if (!array_key_exists($s->id, $this->serviceResults)) {
+                $this->serviceResults[$s->id] = (string) ($s->result ?? '');
+            }
+        }
 
         // Verfahren am Termin: gewählte Modelle + Picker (aktive, nach Kategorie gruppiert, ohne bereits gewählte).
         $selectedExaminations = collect();

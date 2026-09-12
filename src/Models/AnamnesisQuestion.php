@@ -18,6 +18,10 @@ class AnamnesisQuestion extends Model
 {
     protected $table = 'encounter_anamnesis_questions';
 
+    /** Cluster: Momentaufnahme (Vorgang) vs. Dauerzustand (Patient). */
+    public const PERSISTENCE_SNAPSHOT   = 'snapshot';
+    public const PERSISTENCE_PERSISTENT = 'persistent';
+
     protected $fillable = [
         'uuid',
         'team_id',
@@ -27,6 +31,7 @@ class AnamnesisQuestion extends Model
         'type',
         'options',
         'section',
+        'persistence',
         'examiner_scope',
         'position',
         'active',
