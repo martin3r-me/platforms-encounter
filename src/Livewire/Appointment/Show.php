@@ -9,6 +9,7 @@ use Platform\Encounter\Models\Appointment as AppointmentModel;
 use Platform\Encounter\Models\Service as ServiceModel;
 use Platform\Encounter\Models\Anamnesis as AnamnesisModel;
 use Platform\Encounter\Models\AnamnesisQuestion;
+use Platform\Encounter\Models\PatientAnamnesisEntry;
 use Platform\Encounter\Enums\AppointmentStatus;
 use Platform\Encounter\Enums\Audience;
 use Platform\Encounter\Services\CertificateService;
@@ -71,12 +72,42 @@ class Show extends Component
 
         $this->loadAnamnesis($model);
         $this->selectedExaminationIds = $this->loadExaminationIds($model);
+        $this->prefillPersistentAnswers($model);
     }
 
     /** @return array<int,int> examination-IDs der am Termin gewählten Verfahren */
     protected function loadExaminationIds(AppointmentModel $model): array
     {
         return $model->examinations()->pluck('examinations.id')->map(fn ($v) => (int) $v)->values()->all();
+    }
+
+    /**
+     * Dauerfakten fortschreiben: unbeantwortete 'persistent'-Fragen mit dem aktuell gültigen
+     * patientenweiten Wert vorbelegen (der Arzt sieht den Bestand und bestätigt/ändert).
+     */
+    protected function prefillPersistentAnswers(AppointmentModel $model): void
+    {
+        $patientId = (int) $model->patient_id;
+        if (!$patientId) {
+            return;
+        }
+        $team = (int) $model->team_id;
+
+        $persistentIds = $this->relevantQuestions($team)
+            ->where('persistence', 'persistent')->pluck('id')->all();
+        if (empty($persistentIds)) {
+            return;
+        }
+
+        $entries = PatientAnamnesisEntry::query()->forTeam($team)->forPatient($patientId)->open()
+            ->whereIn('question_id', $persistentIds)->get()->keyBy('question_id');
+
+        foreach ($persistentIds as $qid) {
+            $current = $this->anamnesisAnswers[$qid] ?? null;
+            if (($current === null || $current === '') && ($e = $entries->get($qid))) {
+                $this->anamnesisAnswers[$qid] = $e->value;
+            }
+        }
     }
 
     /** Bestehende Anamnese des Termins laden (falls vorhanden). */
@@ -434,7 +465,63 @@ class Show extends Component
             $this->anamnesisId = $anamnesis->id;
         }
 
+        $this->promoteDurableFacts($model, $relevant, $answers);
+
         $this->dispatch('toast', message: 'Anamnese gespeichert.', type: 'success');
+    }
+
+    /**
+     * Dauerfakten fortschreiben: Antworten auf 'persistent'-Fragen patientenweit halten.
+     * Unverändert → bestätigen (last_confirmed_*); geändert → alte Zeile beenden + neue öffnen.
+     *
+     * @param \Illuminate\Support\Collection<int,AnamnesisQuestion> $relevant
+     * @param array<int,mixed> $answers  bereits gefilterte Antworten {question_id: value}
+     */
+    protected function promoteDurableFacts(AppointmentModel $model, \Illuminate\Support\Collection $relevant, array $answers): void
+    {
+        $patientId = (int) $model->patient_id;
+        if (!$patientId) {
+            return;
+        }
+        $team  = (int) $model->team_id;
+        $today = now()->toDateString();
+
+        foreach ($relevant as $q) {
+            if ($q->persistence !== 'persistent') {
+                continue;
+            }
+            $val = $answers[$q->id] ?? null;
+            if ($val === null || $val === '') {
+                continue; // leere Antwort schreibt keinen Dauerfakt fort (kein Auto-Beenden)
+            }
+
+            $open = PatientAnamnesisEntry::query()->forTeam($team)->forPatient($patientId)->open()
+                ->where('question_id', $q->id)->latest('id')->first();
+
+            if ($open && (string) $open->value === (string) $val) {
+                $open->update([
+                    'last_confirmed_appointment_id' => $model->id,
+                    'last_confirmed_at'             => now(),
+                ]);
+                continue;
+            }
+
+            if ($open) {
+                $open->update(['valid_until' => $today]); // ändern: alten Bestand beenden
+            }
+
+            PatientAnamnesisEntry::create([
+                'team_id'                       => $team,
+                'patient_id'                    => $patientId,
+                'question_id'                   => $q->id,
+                'question_snapshot'             => $q->text,
+                'value'                         => $val,
+                'valid_from'                    => $today,
+                'first_appointment_id'          => $model->id,
+                'last_confirmed_appointment_id' => $model->id,
+                'last_confirmed_at'             => now(),
+            ]);
+        }
     }
 
     public function render()

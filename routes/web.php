@@ -9,6 +9,7 @@ use Platform\Encounter\Livewire\Certificate\Show as CertificateShow;
 use Platform\Encounter\Livewire\Settings\Index as SettingsIndex;
 use Platform\Encounter\Livewire\Record\Show as RecordShow;
 use Platform\Encounter\Livewire\Anamnesis\History as AnamnesisHistoryView;
+use Platform\Encounter\Livewire\Anamnesis\Timeline as AnamnesisTimelineView;
 use Platform\Encounter\Http\Controllers\CertificatePdfController;
 
 /*
@@ -20,6 +21,7 @@ Route::get('/', CockpitShow::class)->name('encounter.cockpit');
 Route::get('/kalender', Dashboard::class)->name('encounter.dashboard');
 Route::get('/akte/{patient}', RecordShow::class)->name('encounter.akte.show');
 Route::get('/anamnese-verlauf/{patient}', AnamnesisHistoryView::class)->name('encounter.anamnesis.history');
+Route::get('/anamnese-zeitstrahl/{patient}', AnamnesisTimelineView::class)->name('encounter.anamnesis.timeline');
 Route::get('/appointments', AppointmentIndex::class)->name('encounter.appointments.index');
 Route::get('/appointments/{appointment}', AppointmentShow::class)->name('encounter.appointments.show');
 Route::get('/certificates', CertificateIndex::class)->name('encounter.certificates.index');

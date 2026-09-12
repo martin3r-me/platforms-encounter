@@ -355,6 +355,10 @@
                        class="flex items-center justify-center gap-2 w-full rounded-md border border-[color:var(--nx-line)] px-3 py-2 text-sm font-medium text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)] transition-colors">
                         @svg('heroicon-o-folder-open', 'w-4 h-4') Volle Akte öffnen
                     </a>
+                    <a href="{{ route('encounter.anamnesis.timeline', $appointment->patient->id) }}" wire:navigate
+                       class="mt-2 flex items-center justify-center gap-2 w-full rounded-md border border-[color:var(--nx-line)] px-3 py-2 text-sm font-medium text-[color:var(--nx-text)] hover:bg-[color:var(--nx-hover)] transition-colors">
+                        @svg('heroicon-o-chart-bar', 'w-4 h-4') Dauerfakten-Zeitstrahl
+                    </a>
                 @endif
 
                 {{-- Gefährdung (arbeitsmedizinisch relevant) --}}
