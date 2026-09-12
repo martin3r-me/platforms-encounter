@@ -99,7 +99,7 @@ class Appointment extends Model
             'encounter_appointment_examinations',
             'appointment_id',
             'examination_id'
-        )->withPivot('position')->withTimestamps()
+        )->withPivot('position', 'care_type')->withTimestamps()
          ->orderBy('encounter_appointment_examinations.position');
     }
 

@@ -317,8 +317,10 @@ class Show extends Component
             return;
         }
 
+        // Art nur bei Vorsorge (Default Pflichtvorsorge); Eignung/FeV kennen keine Vorsorge-Art.
+        $careType = ($exam->category_kind === 'vorsorge') ? 'mandatory' : null;
         $appointment->examinations()->syncWithoutDetaching([
-            $examinationId => ['position' => count($this->selectedExaminationIds) + 1],
+            $examinationId => ['position' => count($this->selectedExaminationIds) + 1, 'care_type' => $careType],
         ]);
 
         // Leistung aus dem Verfahren vorbelegen — nur, wenn noch keine für dieses Verfahren existiert.
@@ -337,6 +339,14 @@ class Show extends Component
 
         $this->selectedExaminationIds = $this->loadExaminationIds($appointment);
         $this->addExaminationId = '';
+    }
+
+    /** Art der Vorsorge je Verfahren setzen (Pflicht/Angebot/Wunsch/Nachgehend). */
+    public function setCareType(int $examinationId, ?string $careType): void
+    {
+        $appointment = $this->resolve($this->appointmentId);
+        $careType = in_array($careType, ['mandatory', 'offered', 'request', 'follow_up'], true) ? $careType : null;
+        $appointment->examinations()->updateExistingPivot($examinationId, ['care_type' => $careType]);
     }
 
     /** Verfahren vom Termin entfernen. Die vorbelegte Leistung nur räumen, wenn noch leer (kein Ergebnis). */
@@ -541,12 +551,11 @@ class Show extends Component
         $examinationPickerOptions = ['' => '— Verfahren hinzufügen …'];
         if (class_exists(\Platform\Examinations\Models\Examination::class)) {
             $kindLabels = ['vorsorge' => 'Vorsorge', 'eignung' => 'Eignung', 'fev' => 'FeV'];
-            $rows = \Platform\Examinations\Models\Examination::query()->forTeam($team)->active()
-                ->orderByRaw("FIELD(category_kind, 'vorsorge','eignung','fev')")
-                ->orderBy('number')->orderBy('title')->get();
-            $selectedExaminations = $rows->whereIn('id', $this->selectedExaminationIds)
-                ->sortBy(fn ($e) => array_search((int) $e->id, $this->selectedExaminationIds, true))->values();
-            foreach ($rows as $e) {
+            // Gewählte Verfahren MIT Pivot (care_type, position).
+            $selectedExaminations = $model->examinations()->get();
+            foreach (\Platform\Examinations\Models\Examination::query()->forTeam($team)->active()
+                        ->orderByRaw("FIELD(category_kind, 'vorsorge','eignung','fev')")
+                        ->orderBy('number')->orderBy('title')->get() as $e) {
                 if (in_array((int) $e->id, $this->selectedExaminationIds, true)) {
                     continue;
                 }
@@ -555,6 +564,14 @@ class Show extends Component
                 $examinationPickerOptions[(int) $e->id] = trim(($kind ? "[{$kind}] " : '') . ($e->number ? $e->number . ' · ' : '') . $name);
             }
         }
+
+        // Art der Vorsorge (Screenshot) — Labels wie im Bestand.
+        $careTypeOptions = [
+            'mandatory' => 'Pflichtvorsorge',
+            'offered'   => 'Angebotsvorsorge',
+            'request'   => 'Wunschvorsorge',
+            'follow_up' => 'Nachgehende Vorsorge',
+        ];
 
         // Vermengungsgruppen-Konflikt (z.B. Vorsorge + Eignung): die gewählten Verfahren gegen die Core-Registry.
         $combRefs = array_map(fn ($eid) => ['type' => 'examination', 'id' => (int) $eid], $this->selectedExaminationIds);
@@ -571,6 +588,7 @@ class Show extends Component
             'doctorOptions'       => \Platform\Encounter\Support\Doctors::options((int) Auth::user()->currentTeam->id),
             'selectedExaminations'     => $selectedExaminations,
             'examinationPickerOptions' => $examinationPickerOptions,
+            'careTypeOptions'          => $careTypeOptions,
             'anamnesisQuestions'  => $this->relevantQuestions($team),
             'examinationOptions'  => $this->examinationOptions($team),
             'bundleOptions'       => $this->bundleOptions($team),

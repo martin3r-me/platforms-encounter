@@ -88,15 +88,27 @@
                         @if($selectedExaminations->isEmpty())
                             <div class="text-sm text-[color:var(--nx-muted)] py-1">Noch kein Verfahren gewählt — es erscheinen nur die Basis-Fragen.</div>
                         @else
-                            <div class="flex flex-wrap gap-2 mb-2">
+                            <div class="space-y-2 mb-2">
                                 @foreach($selectedExaminations as $e)
-                                    <span class="inline-flex items-center gap-1 rounded-full border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] px-3 py-1 text-sm text-[color:var(--nx-text)]">
-                                        {{ trim(($e->number ? $e->number.' · ' : '').($e->recommendation_name ?? $e->title)) }}
+                                    <div class="flex items-center gap-2" wire:key="selex-{{ $e->id }}">
+                                        <span class="flex-1 text-sm text-[color:var(--nx-text)]">
+                                            {{ trim(($e->number ? $e->number.' · ' : '').($e->recommendation_name ?? $e->title)) }}
+                                        </span>
+                                        @if($e->category_kind === 'vorsorge')
+                                            <select x-on:change="$wire.setCareType({{ $e->id }}, $event.target.value)"
+                                                    class="rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-2 py-1 text-[color:var(--nx-text)]">
+                                                @foreach($careTypeOptions as $val => $lbl)
+                                                    <option value="{{ $val }}" @selected(($e->pivot->care_type ?? 'mandatory') === $val)>{{ $lbl }}</option>
+                                                @endforeach
+                                            </select>
+                                        @else
+                                            <span class="text-xs text-[color:var(--nx-faint)]">{{ ['eignung'=>'Eignung','fev'=>'FeV'][$e->category_kind] ?? '' }}</span>
+                                        @endif
                                         <button type="button" wire:click="removeExamination({{ $e->id }})"
                                                 class="text-[color:var(--nx-faint)] hover:text-[color:var(--nx-danger)]">
                                             @svg('heroicon-o-x-mark', 'w-4 h-4')
                                         </button>
-                                    </span>
+                                    </div>
                                 @endforeach
                             </div>
                         @endif
