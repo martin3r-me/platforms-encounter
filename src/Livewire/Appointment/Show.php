@@ -262,31 +262,52 @@ class Show extends Component
         return $this->redirectRoute('encounter.certificates.show', ['certificate' => $certificate->id], navigate: true);
     }
 
-    /** Verfahren zum Termin hinzufügen (treibt die Anamnese-Fragen). */
+    /** Verfahren zum Termin hinzufügen (treibt die Anamnese-Fragen) + Leistung vorbelegen. */
     public function addExamination(int $examinationId): void
     {
         $appointment = $this->resolve($this->appointmentId);
 
-        if (class_exists(\Platform\Examinations\Models\Examination::class)) {
-            $ok = \Platform\Examinations\Models\Examination::query()
-                ->forTeam((int) $appointment->team_id)->whereKey($examinationId)->exists();
-            if (!$ok) {
-                return;
-            }
+        $exam = class_exists(\Platform\Examinations\Models\Examination::class)
+            ? \Platform\Examinations\Models\Examination::query()
+                ->forTeam((int) $appointment->team_id)->find($examinationId)
+            : null;
+        if (!$exam) {
+            return;
         }
 
         $appointment->examinations()->syncWithoutDetaching([
             $examinationId => ['position' => count($this->selectedExaminationIds) + 1],
         ]);
+
+        // Leistung aus dem Verfahren vorbelegen — nur, wenn noch keine für dieses Verfahren existiert.
+        $hasService = $appointment->services()
+            ->where('catalog_type', 'examination')->where('catalog_id', $examinationId)->exists();
+        if (!$hasService) {
+            $name  = $exam->recommendation_name ?: $exam->title;
+            $title = trim(($exam->number ? $exam->number . ' · ' : '') . (string) $name);
+            ServiceModel::create([
+                'appointment_id' => $appointment->id,
+                'catalog_type'   => 'examination',
+                'catalog_id'     => $examinationId,
+                'title'          => $title !== '' ? $title : (string) $name,
+            ]);
+        }
+
         $this->selectedExaminationIds = $this->loadExaminationIds($appointment);
         $this->addExaminationId = '';
     }
 
-    /** Verfahren vom Termin entfernen. */
+    /** Verfahren vom Termin entfernen. Die vorbelegte Leistung nur räumen, wenn noch leer (kein Ergebnis). */
     public function removeExamination(int $examinationId): void
     {
         $appointment = $this->resolve($this->appointmentId);
         $appointment->examinations()->detach($examinationId);
+
+        $appointment->services()
+            ->where('catalog_type', 'examination')->where('catalog_id', $examinationId)
+            ->whereNull('result')->whereNull('assessment')->whereNull('next_due')
+            ->delete();
+
         $this->selectedExaminationIds = $this->loadExaminationIds($appointment);
     }
 
