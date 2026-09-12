@@ -34,8 +34,10 @@ class Show extends Component
 
     // --- Anamnese (Stufe B): strukturierte Erfassung je Termin ---
     public ?int $anamnesisId = null;
-    /** Vorsorgeanlass (arbmedvv_occasion-ID als String; '' = ohne Anlass). Plain-Select → kein value=Label-Quirk. */
-    public string $anamnesisOccasion = '';
+    /** Gewählte Verfahren (examination-IDs) — treiben die Anamnese-Fragen. 1..n je Termin. */
+    public array $selectedExaminationIds = [];
+    /** Picker-Wert zum Hinzufügen eines Verfahrens. */
+    public string $addExaminationId = '';
     /** {question_id: value} */
     public array $anamnesisAnswers = [];
     public string $anamnesisFreeText = '';
@@ -65,6 +67,13 @@ class Show extends Component
         }
 
         $this->loadAnamnesis($model);
+        $this->selectedExaminationIds = $this->loadExaminationIds($model);
+    }
+
+    /** @return array<int,int> examination-IDs der am Termin gewählten Verfahren */
+    protected function loadExaminationIds(AppointmentModel $model): array
+    {
+        return $model->examinations()->pluck('examinations.id')->map(fn ($v) => (int) $v)->values()->all();
     }
 
     /** Bestehende Anamnese des Termins laden (falls vorhanden). */
@@ -78,16 +87,12 @@ class Show extends Component
 
         if (!$existing) {
             $this->anamnesisId       = null;
-            $this->anamnesisOccasion = '';
             $this->anamnesisAnswers  = [];
             $this->anamnesisFreeText = '';
             return;
         }
 
         $this->anamnesisId       = $existing->id;
-        $this->anamnesisOccasion = $existing->catalog_type === 'arbmedvv_occasion' && $existing->catalog_id
-            ? (string) $existing->catalog_id
-            : '';
         $this->anamnesisAnswers  = $existing->answers ?? [];
         $this->anamnesisFreeText = (string) ($existing->free_text ?? '');
     }
@@ -257,32 +262,49 @@ class Show extends Component
         return $this->redirectRoute('encounter.certificates.show', ['certificate' => $certificate->id], navigate: true);
     }
 
+    /** Verfahren zum Termin hinzufügen (treibt die Anamnese-Fragen). */
+    public function addExamination(int $examinationId): void
+    {
+        $appointment = $this->resolve($this->appointmentId);
+
+        if (class_exists(\Platform\Examinations\Models\Examination::class)) {
+            $ok = \Platform\Examinations\Models\Examination::query()
+                ->forTeam((int) $appointment->team_id)->whereKey($examinationId)->exists();
+            if (!$ok) {
+                return;
+            }
+        }
+
+        $appointment->examinations()->syncWithoutDetaching([
+            $examinationId => ['position' => count($this->selectedExaminationIds) + 1],
+        ]);
+        $this->selectedExaminationIds = $this->loadExaminationIds($appointment);
+        $this->addExaminationId = '';
+    }
+
+    /** Verfahren vom Termin entfernen. */
+    public function removeExamination(int $examinationId): void
+    {
+        $appointment = $this->resolve($this->appointmentId);
+        $appointment->examinations()->detach($examinationId);
+        $this->selectedExaminationIds = $this->loadExaminationIds($appointment);
+    }
+
     /**
-     * Relevante Fragen: allgemeine (ohne Anlass) + die des gewählten Vorsorgeanlasses.
+     * Relevante Fragen: Basismodul (verfahrensunabhängig) + Fragen ALLER gewählten Verfahren
+     * (Vereinigung, Überschneidungen nur einmal).
      * @return \Illuminate\Support\Collection<int,AnamnesisQuestion>
      */
     protected function relevantQuestions(int $team): \Illuminate\Support\Collection
     {
-        $occasionId = ctype_digit($this->anamnesisOccasion) ? (int) $this->anamnesisOccasion : null;
+        $examIds = array_values(array_unique(array_filter(array_map('intval', $this->selectedExaminationIds))));
 
-        // Fragen hängen am VERFAHREN: Anlass -> examination_id auflösen, dann dessen Fragen laden.
-        $examinationId = null;
-        if ($occasionId && class_exists(\Platform\Arbmedvv\Models\Occasion::class)) {
-            $examinationId = \Platform\Arbmedvv\Models\Occasion::query()
-                ->where('team_id', $team)->whereKey($occasionId)->value('examination_id');
-        }
-
-        // Vereinigung: Basismodul (catalog_type NULL) läuft IMMER mit; dazu die Verfahren-Fragen.
-        // Zusätzlich noch nicht umgehängte anlass-gebundene Fragen (Übergangs-Fallback).
         return AnamnesisQuestion::query()
             ->forTeam($team)->active()
-            ->where(function ($q) use ($examinationId, $occasionId) {
-                $q->whereNull('catalog_type');
-                if ($examinationId) {
-                    $q->orWhere(fn ($w) => $w->where('catalog_type', 'examination')->where('catalog_id', $examinationId));
-                }
-                if ($occasionId) {
-                    $q->orWhere(fn ($w) => $w->where('catalog_type', 'arbmedvv_occasion')->where('catalog_id', $occasionId));
+            ->where(function ($q) use ($examIds) {
+                $q->whereNull('catalog_type'); // Basismodul läuft immer mit
+                if (!empty($examIds)) {
+                    $q->orWhere(fn ($w) => $w->where('catalog_type', 'examination')->whereIn('catalog_id', $examIds));
                 }
             })
             ->orderBy('section')->orderBy('position')->orderBy('id')
@@ -340,8 +362,6 @@ class Show extends Component
         $model = $this->resolve($this->appointmentId);
         $team  = (int) $model->team_id;
 
-        $occasionId = ctype_digit($this->anamnesisOccasion) ? (int) $this->anamnesisOccasion : null;
-
         // Nur Antworten auf tatsächlich relevante Fragen persistieren.
         // Zusätzlich den Fragetext ZUM ANTWORTZEITPUNKT snapshotten (robust gegen spätere
         // Katalog-Änderungen).
@@ -364,8 +384,8 @@ class Show extends Component
 
         $data = [
             'patient_id'         => $model->patient_id,
-            'catalog_type'       => $occasionId ? 'arbmedvv_occasion' : null,
-            'catalog_id'         => $occasionId,
+            'catalog_type'       => null,   // Multi-Verfahren: keine Einzel-Katalog-Bindung an der Anamnese
+            'catalog_id'         => null,
             'answers'            => $answers,
             'questions_snapshot' => $snapshot,
             'free_text'          => $this->anamnesisFreeText ?: null,
@@ -389,25 +409,28 @@ class Show extends Component
         $model = $this->resolve($this->appointmentId)->load(['patient', 'services', 'certificates']);
         $team  = (int) $model->team_id;
 
-        // Vorsorgeanlässe (arbmedvv) guarded — plain-Select-Werte (ID) gegen den value=Label-Quirk.
-        $occasionOptions = [];
-        if (class_exists(\Platform\Arbmedvv\Models\Occasion::class)) {
-            foreach (\Platform\Arbmedvv\Models\Occasion::query()->where('team_id', $team)->orderBy('title')->get() as $o) {
-                $occasionOptions[(int) $o->id] = $o->title;
+        // Verfahren am Termin: gewählte Modelle + Picker (aktive, nach Kategorie gruppiert, ohne bereits gewählte).
+        $selectedExaminations = collect();
+        $examinationPickerOptions = ['' => '— Verfahren hinzufügen …'];
+        if (class_exists(\Platform\Examinations\Models\Examination::class)) {
+            $kindLabels = ['vorsorge' => 'Vorsorge', 'eignung' => 'Eignung', 'fev' => 'FeV'];
+            $rows = \Platform\Examinations\Models\Examination::query()->forTeam($team)->active()
+                ->orderByRaw("FIELD(category_kind, 'vorsorge','eignung','fev')")
+                ->orderBy('number')->orderBy('title')->get();
+            $selectedExaminations = $rows->whereIn('id', $this->selectedExaminationIds)
+                ->sortBy(fn ($e) => array_search((int) $e->id, $this->selectedExaminationIds, true))->values();
+            foreach ($rows as $e) {
+                if (in_array((int) $e->id, $this->selectedExaminationIds, true)) {
+                    continue;
+                }
+                $name = $e->recommendation_name ?: $e->title;
+                $kind = $kindLabels[$e->category_kind] ?? $e->category_kind;
+                $examinationPickerOptions[(int) $e->id] = trim(($kind ? "[{$kind}] " : '') . ($e->number ? $e->number . ' · ' : '') . $name);
             }
         }
 
-        // Vermengungsgruppen-Konflikt (z.B. Vorsorge + Eignung): erbrachte Leistungen (examination)
-        // + gewählter Vorsorgeanlass (arbmedvv_occasion), geprüft über die Core-Registry (lose gekoppelt).
-        $combRefs = [];
-        foreach ($model->services as $s) {
-            if ($s->catalog_type === 'examination' && $s->catalog_id) {
-                $combRefs[] = ['type' => 'examination', 'id' => (int) $s->catalog_id];
-            }
-        }
-        if (ctype_digit($this->anamnesisOccasion)) {
-            $combRefs[] = ['type' => 'arbmedvv_occasion', 'id' => (int) $this->anamnesisOccasion];
-        }
+        // Vermengungsgruppen-Konflikt (z.B. Vorsorge + Eignung): die gewählten Verfahren gegen die Core-Registry.
+        $combRefs = array_map(fn ($eid) => ['type' => 'examination', 'id' => (int) $eid], $this->selectedExaminationIds);
         $combGroups  = app(\Platform\Core\Support\CatalogCombinationRegistry::class)->groupsFor($combRefs);
         $groupLabels = config('examinations.combination_groups', ['vorsorge' => 'Vorsorge', 'eignung' => 'Eignung']);
 
@@ -419,7 +442,8 @@ class Show extends Component
             'audienceOptions'     => collect(Audience::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
             'locationTypeOptions' => \Platform\Encounter\Support\LocationTypes::allowed((int) Auth::user()->currentTeam->id),
             'doctorOptions'       => \Platform\Encounter\Support\Doctors::options((int) Auth::user()->currentTeam->id),
-            'occasionOptions'     => $occasionOptions,
+            'selectedExaminations'     => $selectedExaminations,
+            'examinationPickerOptions' => $examinationPickerOptions,
             'anamnesisQuestions'  => $this->relevantQuestions($team),
             'examinationOptions'  => $this->examinationOptions($team),
             'bundleOptions'       => $this->bundleOptions($team),

@@ -74,7 +74,7 @@
 
         {{-- Anamnese (Stufe B): strukturierter Fragenkatalog, anlassbezogen --}}
         <x-nx-section icon="heroicon-o-clipboard-document-list" title="Anamnese (Fragenkatalog)"
-                      description="Ohne Anlass erscheinen die allgemeinen Fragen, mit Anlass die spezifischen. Verschlüsselt gespeichert (Schweigepflicht).">
+                      description="Fragen = Basismodul + die der gewählten Verfahren (Vereinigung). Verschlüsselt gespeichert (Schweigepflicht).">
             <x-slot name="action">
                 <x-nx-button variant="primary" size="sm" wire:click="saveAnamnesis">
                     @svg('heroicon-o-check', 'w-4 h-4') Anamnese speichern
@@ -82,30 +82,39 @@
             </x-slot>
             <x-nx-card>
                 <div class="space-y-5">
-                    {{-- Vorsorgeanlass (plain-Select gegen value=Label-Quirk; .live lädt Fragen neu) --}}
+                    {{-- Verfahren am Termin (1..n) — treiben die Fragen --}}
                     <div>
-                        <label class="block text-sm mb-1 text-[color:var(--nx-text)]">Vorsorgeanlass</label>
-                        @if(empty($occasionOptions))
-                            <div class="text-sm text-[color:var(--nx-muted)] py-2">Kein Anlass-Katalog (arbmedvv) verfügbar — nur allgemeine Fragen.</div>
+                        <label class="block text-sm mb-1 text-[color:var(--nx-text)]">Untersuchungen (Verfahren)</label>
+                        @if($selectedExaminations->isEmpty())
+                            <div class="text-sm text-[color:var(--nx-muted)] py-1">Noch kein Verfahren gewählt — es erscheinen nur die Basis-Fragen.</div>
                         @else
-                            <select wire:model.live="anamnesisOccasion"
+                            <div class="flex flex-wrap gap-2 mb-2">
+                                @foreach($selectedExaminations as $e)
+                                    <span class="inline-flex items-center gap-1 rounded-full border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] px-3 py-1 text-sm text-[color:var(--nx-text)]">
+                                        {{ trim(($e->number ? $e->number.' · ' : '').($e->recommendation_name ?? $e->title)) }}
+                                        <button type="button" wire:click="removeExamination({{ $e->id }})"
+                                                class="text-[color:var(--nx-faint)] hover:text-[color:var(--nx-danger)]">
+                                            @svg('heroicon-o-x-mark', 'w-4 h-4')
+                                        </button>
+                                    </span>
+                                @endforeach
+                            </div>
+                        @endif
+                        @if(count($examinationPickerOptions) > 1)
+                            <select wire:model="addExaminationId"
+                                    x-on:change="if ($event.target.value) { $wire.addExamination($event.target.value) }"
                                     class="block w-full rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-3 py-1.5 text-[color:var(--nx-text)]">
-                                <option value="">— ohne Anlass (nur allgemeine Fragen) —</option>
-                                @foreach($occasionOptions as $id => $title)
-                                    <option value="{{ $id }}">{{ $title }}</option>
+                                @foreach($examinationPickerOptions as $id => $label)
+                                    <option value="{{ $id }}">{{ $label }}</option>
                                 @endforeach
                             </select>
                         @endif
                     </div>
 
-                    {{-- Relevante Fragen --}}
+                    {{-- Relevante Fragen (Basis + gewählte Verfahren) --}}
                     @if($anamnesisQuestions->isEmpty())
                         <x-nx-empty icon="heroicon-o-question-mark-circle">
-                            @if($anamnesisOccasion !== '')
-                                Für diesen Anlass sind noch keine spezifischen Fragen hinterlegt.
-                            @else
-                                Noch keine allgemeinen Fragen. Fragenkatalog unter Praxis → Einstellungen pflegen.
-                            @endif
+                            Noch keine Fragen. Wähle ein Verfahren oder pflege den Fragenkatalog unter Praxis → Einstellungen.
                         </x-nx-empty>
                     @else
                         <div class="space-y-4">

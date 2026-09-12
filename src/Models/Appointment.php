@@ -89,6 +89,21 @@ class Appointment extends Model
     }
 
     /**
+     * Verfahren (Untersuchungen) dieses Termins — 1..n. Treiber der Anamnese-Fragen.
+     * Lose an examinations gekoppelt (FQCN); nur nutzbar, wenn das Modul installiert ist.
+     */
+    public function examinations(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(
+            \Platform\Examinations\Models\Examination::class,
+            'encounter_appointment_examinations',
+            'appointment_id',
+            'examination_id'
+        )->withPivot('position')->withTimestamps()
+         ->orderBy('encounter_appointment_examinations.position');
+    }
+
+    /**
      * Lose Referenz auf den Patienten (patient-Modul). encounter darf auf patient hängen.
      */
     public function patient(): BelongsTo
