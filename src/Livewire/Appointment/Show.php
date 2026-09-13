@@ -337,6 +337,8 @@ class Show extends Component
             ]);
         }
 
+        $this->applyRecall($appointment, $examinationId, $careType);
+
         $this->selectedExaminationIds = $this->loadExaminationIds($appointment);
         $this->addExaminationId = '';
     }
@@ -347,6 +349,62 @@ class Show extends Component
         $appointment = $this->resolve($this->appointmentId);
         $careType = in_array($careType, ['mandatory', 'offered', 'request', 'follow_up'], true) ? $careType : null;
         $appointment->examinations()->updateExistingPivot($examinationId, ['care_type' => $careType]);
+        $this->applyRecall($appointment, $examinationId, $careType);
+    }
+
+    /**
+     * Nächste Fälligkeit aus Grundsatz + Art + Erst/Folge ableiten und an der Leistung vorbelegen
+     * (ärztlich überschreibbar). Nur Vorsorge; Nachgehende Vorsorge → kein wiederkehrender Recall.
+     */
+    protected function applyRecall(AppointmentModel $appointment, int $examinationId, ?string $careType): void
+    {
+        if (!class_exists(\Platform\Examinations\Models\Examination::class)) {
+            return;
+        }
+        $exam = \Platform\Examinations\Models\Examination::query()
+            ->forTeam((int) $appointment->team_id)->find($examinationId);
+        if (!$exam || $exam->category_kind !== 'vorsorge') {
+            return;
+        }
+
+        $service = $appointment->services()
+            ->where('catalog_type', 'examination')->where('catalog_id', $examinationId)->first();
+        if (!$service) {
+            return;
+        }
+
+        // Nachgehende Vorsorge: kein wiederkehrender Recall.
+        if ($careType === 'follow_up') {
+            $service->update(['interval_active' => false, 'interval_months' => null, 'next_due' => null]);
+            return;
+        }
+
+        // Erst- vs. Folgeuntersuchung: hat der Patient bereits einen ANDEREN Termin mit diesem Verfahren?
+        $isFollowUp = false;
+        if ($appointment->patient_id) {
+            $isFollowUp = \Illuminate\Support\Facades\DB::table('encounter_appointment_examinations as ae')
+                ->join('encounter_appointments as a', 'a.id', '=', 'ae.appointment_id')
+                ->where('ae.examination_id', $examinationId)
+                ->where('a.patient_id', $appointment->patient_id)
+                ->where('a.team_id', $appointment->team_id)
+                ->where('a.id', '!=', $appointment->id)
+                ->exists();
+        }
+
+        $months = $isFollowUp
+            ? ($exam->interval_followup_months ?: $exam->interval_first_months)
+            : ($exam->interval_first_months ?: $exam->interval_followup_months);
+
+        if (!$months) {
+            return; // kein Standard-Intervall im Katalog → nichts vorbelegen
+        }
+
+        $base = \Illuminate\Support\Carbon::parse($appointment->scheduled_at ?: now());
+        $service->update([
+            'interval_active' => true,
+            'interval_months' => (int) $months,
+            'next_due'        => $base->copy()->addMonths((int) $months)->startOfDay(),
+        ]);
     }
 
     /** Verfahren vom Termin entfernen. Die vorbelegte Leistung nur räumen, wenn noch leer (kein Ergebnis). */
