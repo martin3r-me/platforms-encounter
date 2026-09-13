@@ -52,20 +52,15 @@
                     <x-nx-input-datetime name="form.scheduled_at" label="Termin" wire:model="form.scheduled_at" />
                     <x-nx-input-select name="form.status" label="Status" wire:model="form.status" :options="$statusOptions" />
                     <x-nx-input-select name="form.location_type" label="Ort" wire:model="form.location_type" :options="$locationTypeOptions" />
-                    <div>
-                        <label class="block text-sm mb-1 text-[color:var(--nx-text)]">Behandler</label>
-                        @if(empty($doctorOptions))
+                    @if(empty($doctorOptions))
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-[color:var(--nx-text)]">Behandler</label>
                             <div class="text-sm text-[color:var(--nx-muted)] py-2">Keine Ärzte gepflegt (Praxis → Ärzte).</div>
-                        @else
-                            <select wire:model="form.doctor_entity_id"
-                                    class="block w-full rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-3 py-1.5 text-[color:var(--nx-text)]">
-                                <option value="">— kein Behandler —</option>
-                                @foreach($doctorOptions as $id => $name)
-                                    <option value="{{ $id }}">{{ $name }}</option>
-                                @endforeach
-                            </select>
-                        @endif
-                    </div>
+                        </div>
+                    @else
+                        <x-nx-input-select name="form.doctor_entity_id" label="Behandler" wire:model="form.doctor_entity_id"
+                                           :options="$doctorOptions" nullable nullLabel="— kein Behandler —" />
+                    @endif
                     <x-nx-input-text name="form.performed_by" label="Durchgeführt von" wire:model="form.performed_by" />
                     <x-nx-input-text name="form.doctor_stamp" label="Arztstempel" wire:model="form.doctor_stamp" />
                 </div>
@@ -95,12 +90,11 @@
                                             {{ trim(($e->number ? $e->number.' · ' : '').($e->recommendation_name ?? $e->title)) }}
                                         </span>
                                         @if($e->category_kind === 'vorsorge')
-                                            <select x-on:change="$wire.setCareType({{ $e->id }}, $event.target.value)"
-                                                    class="rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-2 py-1 text-[color:var(--nx-text)]">
-                                                @foreach($careTypeOptions as $val => $lbl)
-                                                    <option value="{{ $val }}" @selected(($e->pivot->care_type ?? 'mandatory') === $val)>{{ $lbl }}</option>
-                                                @endforeach
-                                            </select>
+                                            <div class="w-52 shrink-0">
+                                                <x-nx-input-select :options="$careTypeOptions" size="sm"
+                                                                   value="{{ $e->pivot->care_type ?? 'mandatory' }}"
+                                                                   x-on:change="$wire.setCareType({{ $e->id }}, $event.target.value)" />
+                                            </div>
                                         @else
                                             <span class="text-xs text-[color:var(--nx-faint)]">{{ ['eignung'=>'Eignung','fev'=>'FeV'][$e->category_kind] ?? '' }}</span>
                                         @endif
@@ -112,15 +106,16 @@
                                 @endforeach
                             </div>
                         @endif
-                        @if(count($examinationPickerOptions) > 1)
-                            <select wire:model="addExaminationId"
-                                    x-on:change="if ($event.target.value) { $wire.addExamination($event.target.value) }"
-                                    class="block w-full rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-3 py-1.5 text-[color:var(--nx-text)]">
-                                @foreach($examinationPickerOptions as $id => $label)
-                                    <option value="{{ $id }}">{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        @endif
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            @if(count($examinationPickerOptions) > 0)
+                                <x-nx-input-select :options="$examinationPickerOptions" nullable nullLabel="+ Verfahren hinzufügen …"
+                                                   x-on:change="if ($event.target.value) { $wire.addExamination($event.target.value) }" />
+                            @endif
+                            @if(!empty($bundleOptions))
+                                <x-nx-input-select :options="$bundleOptions" nullable nullLabel="+ Bündel übernehmen …"
+                                                   x-on:change="if ($event.target.value) { $wire.addBundle($event.target.value) }" />
+                            @endif
+                        </div>
                     </div>
 
                     {{-- Relevante Fragen (Basis + gewählte Verfahren) --}}
@@ -147,27 +142,16 @@
                                     </label>
                                     @php($qt = $q->type instanceof \Platform\Encounter\Enums\QuestionType ? $q->type->value : $q->type)
                                     @if($qt === 'yes_no')
-                                        <select wire:model="anamnesisAnswers.{{ $q->id }}"
-                                                class="block w-full rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-3 py-1.5 text-[color:var(--nx-text)]">
-                                            <option value="">—</option>
-                                            <option value="ja">Ja</option>
-                                            <option value="nein">Nein</option>
-                                            <option value="unbekannt">Unbekannt</option>
-                                        </select>
+                                        <x-nx-input-select name="anamnesisAnswers.{{ $q->id }}" wire:model="anamnesisAnswers.{{ $q->id }}"
+                                                           :options="['ja' => 'Ja', 'nein' => 'Nein', 'unbekannt' => 'Unbekannt']"
+                                                           nullable nullLabel="—" />
                                     @elseif($qt === 'choice')
-                                        <select wire:model="anamnesisAnswers.{{ $q->id }}"
-                                                class="block w-full rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-3 py-1.5 text-[color:var(--nx-text)]">
-                                            <option value="">—</option>
-                                            @foreach(($q->options ?? []) as $opt)
-                                                <option value="{{ $opt }}">{{ $opt }}</option>
-                                            @endforeach
-                                        </select>
+                                        <x-nx-input-select name="anamnesisAnswers.{{ $q->id }}" wire:model="anamnesisAnswers.{{ $q->id }}"
+                                                           :options="$q->options ?? []" nullable nullLabel="—" />
                                     @elseif($qt === 'scale')
-                                        <input type="number" wire:model="anamnesisAnswers.{{ $q->id }}"
-                                               class="block w-full rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-3 py-1.5 text-[color:var(--nx-text)]" />
+                                        <x-nx-input-number name="anamnesisAnswers.{{ $q->id }}" wire:model="anamnesisAnswers.{{ $q->id }}" />
                                     @else
-                                        <input type="text" wire:model="anamnesisAnswers.{{ $q->id }}"
-                                               class="block w-full rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-3 py-1.5 text-[color:var(--nx-text)]" />
+                                        <x-nx-input-text name="anamnesisAnswers.{{ $q->id }}" wire:model="anamnesisAnswers.{{ $q->id }}" />
                                     @endif
                                 </div>
                             @endforeach
@@ -195,29 +179,12 @@
 
         {{-- Erbrachte Leistungen --}}
         <x-nx-section icon="heroicon-o-clipboard-document-check" title="Erbrachte Leistungen"
+                      description="Entstehen aus den gewählten Verfahren; Ergebnis direkt eintragbar."
                       :hint="$appointment->services->count()">
-            <x-slot name="action">
-                <div class="flex items-center gap-2">
-                    @if(!empty($bundleOptions))
-                        {{-- Produkt-Bündel als Paket übernehmen (legt je enthaltener Untersuchung eine Leistung an) --}}
-                        <select
-                            class="text-sm rounded-[var(--nx-radius,8px)] border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-[color:var(--nx-text)] px-2 py-1.5"
-                            x-on:change="if ($event.target.value) { $wire.addBundle($event.target.value); $event.target.value=''; }">
-                            <option value="">Bündel übernehmen …</option>
-                            @foreach($bundleOptions as $bid => $blabel)
-                                <option value="{{ $bid }}">{{ $blabel }}</option>
-                            @endforeach
-                        </select>
-                    @endif
-                    <x-nx-button variant="secondary" size="sm" wire:click="$set('showServiceModal', true)">
-                        @svg('heroicon-o-plus', 'w-4 h-4') Leistung erfassen
-                    </x-nx-button>
-                </div>
-            </x-slot>
             @if($appointment->services->isEmpty())
                 <x-nx-card>
                     <x-nx-empty icon="heroicon-o-clipboard-document-list">
-                        Noch keine Leistungen an diesem Termin.
+                        Noch keine Leistungen — wähle oben im Anamnese-Abschnitt ein Verfahren.
                     </x-nx-empty>
                 </x-nx-card>
             @else
@@ -446,39 +413,6 @@
             </div>
         </x-ui-page-sidebar>
     </x-slot>
-
-    {{-- Leistung erfassen --}}
-    <x-nx-modal wire:model="showServiceModal" size="md">
-        <x-slot name="header">Leistung erfassen</x-slot>
-        <div class="space-y-4">
-            {{-- Untersuchungs-Katalog (examinations) — bindet die Leistung an einen DGUV-Grundsatz --}}
-            @if(!empty($examinationOptions))
-                <div>
-                    <label class="block text-sm mb-1 text-[color:var(--nx-text)]">Untersuchung (Katalog)</label>
-                    <select wire:model="serviceForm.examination_id"
-                            class="block w-full rounded-md border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-sm px-3 py-1.5 text-[color:var(--nx-text)]">
-                        <option value="">— frei (keine Katalog-Untersuchung) —</option>
-                        @foreach($examinationOptions as $eid => $elabel)
-                            <option value="{{ $eid }}">{{ $elabel }}</option>
-                        @endforeach
-                    </select>
-                    <p class="text-xs text-[color:var(--nx-faint)] mt-1">Katalog-Untersuchung wählen (füllt den Titel) oder unten frei eintragen.</p>
-                </div>
-            @endif
-            <x-nx-input-text name="serviceForm.title" label="Leistung / Titel" wire:model="serviceForm.title"
-                             hint="Optional, wenn oben eine Katalog-Untersuchung gewählt ist." />
-            <x-nx-input-text name="serviceForm.result" label="Ergebnis" wire:model="serviceForm.result" />
-            <x-nx-input-checkbox name="serviceForm.interval_active" label="Wiedervorlage (Recall)" wire:model.live="serviceForm.interval_active" />
-            <x-nx-input-number name="serviceForm.interval_months" label="Intervall (Monate)" wire:model="serviceForm.interval_months"
-                               hint="Nächste Fälligkeit = Termin + Intervall." />
-        </div>
-        <x-slot name="footer">
-            <div class="flex justify-end gap-3">
-                <x-nx-button variant="ghost" wire:click="$set('showServiceModal', false)">Abbrechen</x-nx-button>
-                <x-nx-button variant="primary" wire:click="addService">Erfassen</x-nx-button>
-            </div>
-        </x-slot>
-    </x-nx-modal>
 
     {{-- Bescheinigung ausstellen --}}
     <x-nx-modal wire:model="showCertModal" size="md">

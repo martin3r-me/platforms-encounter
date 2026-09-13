@@ -237,9 +237,8 @@ class Show extends Component
     }
 
     /**
-     * Produkt-Bündel (examinations) übernehmen: je enthaltener Untersuchung eine Leistung anlegen.
-     * Bereits erfasste Untersuchungen werden übersprungen (kein Doppeln). Guarded — Modul optional.
-     * Die Vermengungsgruppen-Prüfung bleibt lose (Banner in render(); harter Block erst bei Bescheinigung).
+     * Produkt-Bündel übernehmen: alle enthaltenen Verfahren als gewählte Verfahren aufnehmen
+     * (inkl. Leistung + Recall). Bereits gewählte werden übersprungen. Guarded — Modul optional.
      */
     public function addBundle(int $bundleId): void
     {
@@ -248,37 +247,29 @@ class Show extends Component
         }
 
         $appointment = $this->resolve($this->appointmentId);
-        $team        = (int) $appointment->team_id;
 
-        $bundle = \Platform\Examinations\Models\ExaminationBundle::query()->forTeam($team)
+        $bundle = \Platform\Examinations\Models\ExaminationBundle::query()->forTeam((int) $appointment->team_id)
             ->with('examinations')->find($bundleId);
         if (!$bundle) {
             return;
         }
 
-        $existingIds = $appointment->services()
-            ->where('catalog_type', 'examination')->pluck('catalog_id')
-            ->filter()->map(fn ($v) => (int) $v)->all();
-
         $added = 0;
         foreach ($bundle->examinations as $exam) {
-            if (in_array((int) $exam->id, $existingIds, true)) {
-                continue; // schon erfasst — nicht doppeln
+            if (in_array((int) $exam->id, $this->selectedExaminationIds, true)) {
+                continue; // schon gewählt
             }
-            ServiceModel::create([
-                'appointment_id' => $appointment->id,
-                'catalog_type'   => 'examination',
-                'catalog_id'     => (int) $exam->id,
-                'title'          => $exam->label(),
-            ]);
-            $existingIds[] = (int) $exam->id;
+            $this->attachExamination($appointment, $exam);
+            $this->selectedExaminationIds[] = (int) $exam->id; // Dedup/Position im Loop
             $added++;
         }
 
+        $this->selectedExaminationIds = $this->loadExaminationIds($appointment);
+
         $this->dispatch('toast',
             message: $added > 0
-                ? "Bündel „{$bundle->name}“ übernommen ({$added} Leistung(en))."
-                : 'Alle Leistungen dieses Bündels sind bereits erfasst.',
+                ? "Bündel „{$bundle->name}“ übernommen ({$added} Verfahren)."
+                : 'Alle Verfahren dieses Bündels sind bereits gewählt.',
             type: $added > 0 ? 'success' : 'info');
     }
 
@@ -304,7 +295,7 @@ class Show extends Component
         return $this->redirectRoute('encounter.certificates.show', ['certificate' => $certificate->id], navigate: true);
     }
 
-    /** Verfahren zum Termin hinzufügen (treibt die Anamnese-Fragen) + Leistung vorbelegen. */
+    /** Verfahren zum Termin hinzufügen (treibt Fragen + Leistung + Recall). */
     public function addExamination(int $examinationId): void
     {
         $appointment = $this->resolve($this->appointmentId);
@@ -317,10 +308,24 @@ class Show extends Component
             return;
         }
 
+        $this->attachExamination($appointment, $exam);
+
+        $this->selectedExaminationIds = $this->loadExaminationIds($appointment);
+        $this->addExaminationId = '';
+    }
+
+    /** Ein Verfahren an den Termin hängen: Pivot (+ Art-Default) + Leistung vorbelegen + Recall ableiten. */
+    protected function attachExamination(AppointmentModel $appointment, $exam): void
+    {
+        $examinationId = (int) $exam->id;
+
         // Art nur bei Vorsorge (Default Pflichtvorsorge); Eignung/FeV kennen keine Vorsorge-Art.
         $careType = ($exam->category_kind === 'vorsorge') ? 'mandatory' : null;
+
+        $pos = (int) \Illuminate\Support\Facades\DB::table('encounter_appointment_examinations')
+            ->where('appointment_id', $appointment->id)->max('position') + 1;
         $appointment->examinations()->syncWithoutDetaching([
-            $examinationId => ['position' => count($this->selectedExaminationIds) + 1, 'care_type' => $careType],
+            $examinationId => ['position' => $pos, 'care_type' => $careType],
         ]);
 
         // Leistung aus dem Verfahren vorbelegen — nur, wenn noch keine für dieses Verfahren existiert.
@@ -338,9 +343,6 @@ class Show extends Component
         }
 
         $this->applyRecall($appointment, $examinationId, $careType);
-
-        $this->selectedExaminationIds = $this->loadExaminationIds($appointment);
-        $this->addExaminationId = '';
     }
 
     /** Art der Vorsorge je Verfahren setzen (Pflicht/Angebot/Wunsch/Nachgehend). */
@@ -606,7 +608,7 @@ class Show extends Component
 
         // Verfahren am Termin: gewählte Modelle + Picker (aktive, nach Kategorie gruppiert, ohne bereits gewählte).
         $selectedExaminations = collect();
-        $examinationPickerOptions = ['' => '— Verfahren hinzufügen …'];
+        $examinationPickerOptions = []; // Liste ['value'=>id,'label'=>…] für x-nx-input-select
         if (class_exists(\Platform\Examinations\Models\Examination::class)) {
             $kindLabels = ['vorsorge' => 'Vorsorge', 'eignung' => 'Eignung', 'fev' => 'FeV'];
             // Gewählte Verfahren MIT Pivot (care_type, position).
@@ -619,7 +621,10 @@ class Show extends Component
                 }
                 $name = $e->recommendation_name ?: $e->title;
                 $kind = $kindLabels[$e->category_kind] ?? $e->category_kind;
-                $examinationPickerOptions[(int) $e->id] = trim(($kind ? "[{$kind}] " : '') . ($e->number ? $e->number . ' · ' : '') . $name);
+                $examinationPickerOptions[] = [
+                    'value' => (int) $e->id,
+                    'label' => trim(($kind ? "[{$kind}] " : '') . ($e->number ? $e->number . ' · ' : '') . $name),
+                ];
             }
         }
 
@@ -643,13 +648,14 @@ class Show extends Component
             'statusOptions'       => collect(AppointmentStatus::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
             'audienceOptions'     => collect(Audience::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all(),
             'locationTypeOptions' => \Platform\Encounter\Support\LocationTypes::allowed((int) Auth::user()->currentTeam->id),
-            'doctorOptions'       => \Platform\Encounter\Support\Doctors::options((int) Auth::user()->currentTeam->id),
+            'doctorOptions'       => collect(\Platform\Encounter\Support\Doctors::options((int) Auth::user()->currentTeam->id))
+                                        ->map(fn ($n, $id) => ['value' => (int) $id, 'label' => $n])->values()->all(),
             'selectedExaminations'     => $selectedExaminations,
             'examinationPickerOptions' => $examinationPickerOptions,
             'careTypeOptions'          => $careTypeOptions,
             'anamnesisQuestions'  => $this->relevantQuestions($team),
-            'examinationOptions'  => $this->examinationOptions($team),
-            'bundleOptions'       => $this->bundleOptions($team),
+            'bundleOptions'       => collect($this->bundleOptions($team))
+                                        ->map(fn ($l, $id) => ['value' => (int) $id, 'label' => $l])->values()->all(),
         ], $this->patientContext($model, $team)))->layout('platform::layouts.app');
     }
 
