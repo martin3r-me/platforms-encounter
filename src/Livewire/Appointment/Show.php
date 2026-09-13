@@ -10,6 +10,7 @@ use Platform\Encounter\Models\Service as ServiceModel;
 use Platform\Encounter\Models\Anamnesis as AnamnesisModel;
 use Platform\Encounter\Models\AnamnesisQuestion;
 use Platform\Encounter\Models\PatientAnamnesisEntry;
+use Platform\Encounter\Models\PracticeService;
 use Platform\Encounter\Enums\AppointmentStatus;
 use Platform\Encounter\Enums\Audience;
 use Platform\Encounter\Services\CertificateService;
@@ -32,6 +33,9 @@ class Show extends Component
 
     /** Inline-Ergebnisse je Leistung: {service_id: result}. Speichert on-blur. */
     public array $serviceResults = [];
+
+    /** Freitext für eine freie Leistung (ohne Verfahren/Katalog). */
+    public string $newFreeService = '';
 
     public bool $showCertModal = false;
     public string $certAudience = 'patient';
@@ -226,6 +230,39 @@ class Show extends Component
     {
         $appointment = $this->resolve($this->appointmentId);
         $appointment->services()->where('id', $serviceId)->delete();
+    }
+
+    /** Leistung aus dem Praxis-Katalog (frei pflegbar, ohne Verfahren) übernehmen. */
+    public function addPracticeService(int $practiceServiceId): void
+    {
+        $appointment = $this->resolve($this->appointmentId);
+        $ps = PracticeService::query()->forTeam((int) $appointment->team_id)->find($practiceServiceId);
+        if (!$ps) {
+            return;
+        }
+        ServiceModel::create([
+            'appointment_id' => $appointment->id,
+            'catalog_type'   => 'practice_service',
+            'catalog_id'     => (int) $ps->id,
+            'title'          => $ps->title,
+        ]);
+    }
+
+    /** Freie Leistung (Freitext, ohne Katalog/Verfahren) am Termin erfassen. */
+    public function addFreeService(): void
+    {
+        $title = trim($this->newFreeService);
+        if ($title === '') {
+            return;
+        }
+        $appointment = $this->resolve($this->appointmentId);
+        ServiceModel::create([
+            'appointment_id' => $appointment->id,
+            'catalog_type'   => null,
+            'catalog_id'     => null,
+            'title'          => $title,
+        ]);
+        $this->newFreeService = '';
     }
 
     /** Inline-Ergebnis einer Leistung on-blur speichern. */
@@ -628,6 +665,12 @@ class Show extends Component
             }
         }
 
+        // Praxis-Leistungs-Katalog (frei, ohne Verfahren) — Liste für den Picker.
+        $practiceServiceOptions = [];
+        foreach (PracticeService::query()->forTeam($team)->active()->orderBy('position')->orderBy('title')->get() as $ps) {
+            $practiceServiceOptions[] = ['value' => (int) $ps->id, 'label' => $ps->title];
+        }
+
         // Art der Vorsorge (Screenshot) — Labels wie im Bestand.
         $careTypeOptions = [
             'mandatory' => 'Pflichtvorsorge',
@@ -652,6 +695,7 @@ class Show extends Component
                                         ->map(fn ($n, $id) => ['value' => (int) $id, 'label' => $n])->values()->all(),
             'selectedExaminations'     => $selectedExaminations,
             'examinationPickerOptions' => $examinationPickerOptions,
+            'practiceServiceOptions'   => $practiceServiceOptions,
             'careTypeOptions'          => $careTypeOptions,
             'anamnesisQuestions'  => $this->relevantQuestions($team),
             'bundleOptions'       => collect($this->bundleOptions($team))

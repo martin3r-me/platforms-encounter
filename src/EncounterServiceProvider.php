@@ -46,6 +46,7 @@ class EncounterServiceProvider extends ServiceProvider
             'encounter_text_block'  => TextBlock::class,
             'encounter_anamnesis_question' => \Platform\Encounter\Models\AnamnesisQuestion::class,
             'encounter_anamnesis'          => \Platform\Encounter\Models\Anamnesis::class,
+            'practice_service'             => \Platform\Encounter\Models\PracticeService::class,
         ]);
 
         if (

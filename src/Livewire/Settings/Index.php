@@ -8,6 +8,7 @@ use Platform\Encounter\Models\TextBlock as TextBlockModel;
 use Platform\Encounter\Models\FieldDefinition as FieldDefinitionModel;
 use Platform\Encounter\Models\Practice as PracticeModel;
 use Platform\Encounter\Models\AnamnesisQuestion as AnamnesisQuestionModel;
+use Platform\Encounter\Models\PracticeService as PracticeServiceModel;
 use Platform\Encounter\Enums\Audience;
 use Platform\Encounter\Enums\FieldType;
 use Platform\Encounter\Enums\QuestionType;
@@ -28,6 +29,11 @@ class Index extends Component
     public bool $showQuestionModal = false;
     public ?int $editingQuestionId = null;
     public array $questionForm = ['text' => '', 'type' => 'yes_no', 'examination_id' => '', 'persistence' => 'snapshot', 'examiner_scope' => '', 'section' => '', 'position' => 0, 'active' => true];
+
+    // --- Praxis-Leistungs-Katalog ---
+    public bool $showPracticeServiceModal = false;
+    public ?int $editingPracticeServiceId = null;
+    public array $practiceServiceForm = ['title' => '', 'description' => '', 'position' => 0, 'active' => true];
 
     // --- Praxis-Profil ---
     public array $practiceForm = [
@@ -244,6 +250,61 @@ class Index extends Component
         AnamnesisQuestionModel::query()->forTeam($this->teamId())->findOrFail($id)->delete();
     }
 
+    // ===== Praxis-Leistungs-Katalog =====
+
+    public function openPracticeServiceCreate(): void
+    {
+        $this->editingPracticeServiceId = null;
+        $this->practiceServiceForm = ['title' => '', 'description' => '', 'position' => 0, 'active' => true];
+        $this->resetValidation();
+        $this->showPracticeServiceModal = true;
+    }
+
+    public function openPracticeServiceEdit(int $id): void
+    {
+        $ps = PracticeServiceModel::query()->forTeam($this->teamId())->findOrFail($id);
+        $this->editingPracticeServiceId = $ps->id;
+        $this->practiceServiceForm = [
+            'title'       => $ps->title,
+            'description' => $ps->description ?? '',
+            'position'    => (int) $ps->position,
+            'active'      => (bool) $ps->active,
+        ];
+        $this->resetValidation();
+        $this->showPracticeServiceModal = true;
+    }
+
+    public function savePracticeService(): void
+    {
+        $data = $this->validate([
+            'practiceServiceForm.title'       => ['required', 'string', 'max:255'],
+            'practiceServiceForm.description' => ['nullable', 'string'],
+            'practiceServiceForm.position'    => ['nullable', 'integer'],
+        ])['practiceServiceForm'];
+
+        $payload = [
+            'team_id'     => $this->teamId(),
+            'title'       => trim((string) $data['title']),
+            'description' => $data['description'] ?: null,
+            'position'    => (int) ($data['position'] ?? 0),
+            'active'      => (bool) ($this->practiceServiceForm['active'] ?? true),
+        ];
+
+        if ($this->editingPracticeServiceId) {
+            PracticeServiceModel::query()->forTeam($this->teamId())->findOrFail($this->editingPracticeServiceId)->update($payload);
+        } else {
+            PracticeServiceModel::create($payload);
+        }
+
+        $this->showPracticeServiceModal = false;
+        $this->dispatch('toast', message: 'Praxis-Leistung gespeichert.', type: 'success');
+    }
+
+    public function deletePracticeService(int $id): void
+    {
+        PracticeServiceModel::query()->forTeam($this->teamId())->findOrFail($id)->delete();
+    }
+
     // ===== Praxis-Profil =====
 
     public function savePractice(): void
@@ -289,6 +350,7 @@ class Index extends Component
             'questionTypeOptions' => QuestionType::options(),
             'examinationOptions'  => $examinationOptions,
             'persistenceOptions'  => ['snapshot' => 'Momentaufnahme (Vorgang)', 'persistent' => 'Dauerzustand (Patient)'],
+            'practiceServices'    => PracticeServiceModel::query()->forTeam($team)->orderBy('position')->orderBy('title')->get(),
         ])->layout('platform::layouts.app');
     }
 }

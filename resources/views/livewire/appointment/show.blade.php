@@ -179,8 +179,25 @@
 
         {{-- Erbrachte Leistungen --}}
         <x-nx-section icon="heroicon-o-clipboard-document-check" title="Erbrachte Leistungen"
-                      description="Entstehen aus den gewählten Verfahren; Ergebnis direkt eintragbar."
+                      description="Aus den gewählten Verfahren — plus Praxis-Katalog & freie Leistungen."
                       :hint="$appointment->services->count()">
+            {{-- Hinzufügen: Praxis-Katalog-Leistung / freie Leistung (Freitext) --}}
+            <div class="mb-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                @if(!empty($practiceServiceOptions))
+                    <x-nx-input-select :options="$practiceServiceOptions" nullable nullLabel="+ Praxis-Leistung …"
+                                       x-on:change="if ($event.target.value) { $wire.addPracticeService($event.target.value) }" />
+                @else
+                    <div class="text-xs text-[color:var(--nx-muted)] self-center">Kein Praxis-Katalog gepflegt (Praxis → Einstellungen).</div>
+                @endif
+                <div class="flex gap-2">
+                    <input type="text" wire:model="newFreeService" placeholder="Freie Leistung (Freitext) …"
+                           x-on:keydown.enter.prevent="$wire.addFreeService()"
+                           class="flex-1 rounded-[6px] border border-[color:var(--nx-line-strong)] bg-[color:var(--nx-surface)] text-sm px-3 py-2 text-[color:var(--nx-text)] focus:outline-none focus:ring-1 focus:ring-[color:var(--nx-accent)] focus:border-[color:var(--nx-accent)]" />
+                    <x-nx-button variant="secondary" size="sm" wire:click="addFreeService">
+                        @svg('heroicon-o-plus', 'w-4 h-4') Hinzufügen
+                    </x-nx-button>
+                </div>
+            </div>
             @if($appointment->services->isEmpty())
                 <x-nx-card>
                     <x-nx-empty icon="heroicon-o-clipboard-document-list">

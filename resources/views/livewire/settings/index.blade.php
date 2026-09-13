@@ -177,6 +177,56 @@
             @endif
         </x-nx-section>
 
+        {{-- Praxis-Leistungs-Katalog --}}
+        <x-nx-section icon="heroicon-o-clipboard-document-check" title="Praxis-Leistungen"
+                      description="Frei pflegbare Leistungen ohne DGUV-Verfahren (am Termin wählbar)."
+                      :hint="$practiceServices->count()">
+            <x-slot name="action">
+                <x-nx-button variant="secondary" size="sm" wire:click="openPracticeServiceCreate">
+                    @svg('heroicon-o-plus', 'w-4 h-4') Neue Leistung
+                </x-nx-button>
+            </x-slot>
+            @if($practiceServices->isEmpty())
+                <x-nx-card>
+                    <x-nx-empty icon="heroicon-o-clipboard-document-check">Noch keine Praxis-Leistungen.</x-nx-empty>
+                </x-nx-card>
+            @else
+                <x-nx-card flush>
+                    <x-nx-table>
+                        <x-nx-table-header>
+                            <x-nx-table-header-cell>Leistung</x-nx-table-header-cell>
+                            <x-nx-table-header-cell>Status</x-nx-table-header-cell>
+                            <x-nx-table-header-cell align="right"></x-nx-table-header-cell>
+                        </x-nx-table-header>
+                        <x-nx-table-body>
+                            @foreach($practiceServices as $ps)
+                                <x-nx-table-row wire:key="ps-{{ $ps->id }}">
+                                    <x-nx-table-cell>
+                                        {{ $ps->title }}
+                                        @if($ps->description)<div class="text-xs text-[color:var(--nx-faint)]">{{ $ps->description }}</div>@endif
+                                    </x-nx-table-cell>
+                                    <x-nx-table-cell>
+                                        <x-nx-badge :variant="$ps->active ? 'success' : 'default'">{{ $ps->active ? 'aktiv' : 'inaktiv' }}</x-nx-badge>
+                                    </x-nx-table-cell>
+                                    <x-nx-table-cell align="right">
+                                        <div class="flex justify-end gap-2">
+                                            <x-nx-button variant="ghost" size="xs" wire:click="openPracticeServiceEdit({{ $ps->id }})">
+                                                @svg('heroicon-o-pencil-square', 'w-4 h-4')
+                                            </x-nx-button>
+                                            <x-nx-button variant="danger" size="xs" wire:click="deletePracticeService({{ $ps->id }})"
+                                                         wire:confirm="Leistung löschen?">
+                                                @svg('heroicon-o-trash', 'w-4 h-4')
+                                            </x-nx-button>
+                                        </div>
+                                    </x-nx-table-cell>
+                                </x-nx-table-row>
+                            @endforeach
+                        </x-nx-table-body>
+                    </x-nx-table>
+                </x-nx-card>
+            @endif
+        </x-nx-section>
+
         {{-- Praxis-Profil --}}
         <x-nx-section icon="heroicon-o-building-storefront" title="Praxis-Profil"
                       description="Briefkopf für Bescheinigungen/PDF (ein Datensatz je Team).">
@@ -287,6 +337,25 @@
         <x-slot name="footer">
             <x-nx-button variant="ghost" wire:click="$set('showQuestionModal', false)">Abbrechen</x-nx-button>
             <x-nx-button variant="primary" wire:click="saveQuestion">Speichern</x-nx-button>
+        </x-slot>
+    </x-nx-modal>
+
+    {{-- Praxis-Leistung anlegen/bearbeiten --}}
+    <x-nx-modal wire:model="showPracticeServiceModal" size="md">
+        <x-slot name="header">{{ $editingPracticeServiceId ? 'Praxis-Leistung bearbeiten' : 'Neue Praxis-Leistung' }}</x-slot>
+        <div class="space-y-4">
+            <x-nx-input-text name="practiceServiceForm.title" label="Leistung" wire:model="practiceServiceForm.title" />
+            <x-nx-input-textarea name="practiceServiceForm.description" label="Beschreibung (optional)" wire:model="practiceServiceForm.description" rows="2" />
+            <x-nx-input-text name="practiceServiceForm.position" type="number" label="Position" wire:model="practiceServiceForm.position" />
+            <label class="flex items-center gap-2 text-sm text-[color:var(--nx-text)]">
+                <input type="checkbox" wire:model="practiceServiceForm.active" class="rounded border-[color:var(--nx-line)]" /> Aktiv
+            </label>
+        </div>
+        <x-slot name="footer">
+            <div class="flex justify-end gap-3">
+                <x-nx-button variant="ghost" wire:click="$set('showPracticeServiceModal', false)">Abbrechen</x-nx-button>
+                <x-nx-button variant="primary" wire:click="savePracticeService">Speichern</x-nx-button>
+            </div>
         </x-slot>
     </x-nx-modal>
 </x-ui-page>
