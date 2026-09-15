@@ -181,14 +181,22 @@
         <x-nx-section icon="heroicon-o-clipboard-document-check" title="Erbrachte Leistungen"
                       description="Aus den gewählten Verfahren — plus Praxis-Katalog & freie Leistungen."
                       :hint="$appointment->services->count()">
-            {{-- Hinzufügen: Praxis-Katalog-Leistung / freie Leistung (Freitext) --}}
-            <div class="mb-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                @if(!empty($practiceServiceOptions))
-                    <x-nx-input-select :options="$practiceServiceOptions" nullable nullLabel="+ Praxis-Leistung …"
-                                       x-on:change="if ($event.target.value) { $wire.addPracticeService($event.target.value) }" />
-                @else
-                    <div class="text-xs text-[color:var(--nx-muted)] self-center">Kein Praxis-Katalog gepflegt (Praxis → Einstellungen).</div>
-                @endif
+            {{-- Hinzufügen: steckbare Kataloge (Praxis / Impfungen / Labor) + freie Leistung --}}
+            <div class="mb-3 space-y-2">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    @if(!empty($practiceServiceOptions))
+                        <x-nx-input-select :options="$practiceServiceOptions" nullable nullLabel="+ Praxis-Leistung …"
+                                           x-on:change="if ($event.target.value) { $wire.addPracticeService($event.target.value) }" />
+                    @endif
+                    @if(!empty($vaccinationOptions))
+                        <x-nx-input-select :options="$vaccinationOptions" nullable nullLabel="+ Impfung …"
+                                           x-on:change="if ($event.target.value) { $wire.addVaccination($event.target.value) }" />
+                    @endif
+                    @if(!empty($labTestOptions))
+                        <x-nx-input-select :options="$labTestOptions" nullable nullLabel="+ Laboranalyt …"
+                                           x-on:change="if ($event.target.value) { $wire.addLabTest($event.target.value) }" />
+                    @endif
+                </div>
                 <div class="flex gap-2">
                     <input type="text" wire:model="newFreeService" placeholder="Freie Leistung (Freitext) …"
                            x-on:keydown.enter.prevent="$wire.addFreeService()"

@@ -248,6 +248,44 @@ class Show extends Component
         ]);
     }
 
+    /** Impfung aus dem Impfungen-Katalog (Modul vaccinations) übernehmen. Lose gekoppelt. */
+    public function addVaccination(int $vaccinationId): void
+    {
+        if (!class_exists(\Platform\Vaccinations\Models\Vaccination::class)) {
+            return;
+        }
+        $appointment = $this->resolve($this->appointmentId);
+        $v = \Platform\Vaccinations\Models\Vaccination::query()->forTeam((int) $appointment->team_id)->find($vaccinationId);
+        if (!$v) {
+            return;
+        }
+        ServiceModel::create([
+            'appointment_id' => $appointment->id,
+            'catalog_type'   => 'vaccination',
+            'catalog_id'     => (int) $v->id,
+            'title'          => $v->label(),
+        ]);
+    }
+
+    /** Laboranalyt aus dem Labor-Katalog (Modul laboratory) übernehmen. Lose gekoppelt. */
+    public function addLabTest(int $labTestId): void
+    {
+        if (!class_exists(\Platform\Laboratory\Models\LabTest::class)) {
+            return;
+        }
+        $appointment = $this->resolve($this->appointmentId);
+        $t = \Platform\Laboratory\Models\LabTest::query()->forTeam((int) $appointment->team_id)->find($labTestId);
+        if (!$t) {
+            return;
+        }
+        ServiceModel::create([
+            'appointment_id' => $appointment->id,
+            'catalog_type'   => 'lab_test',
+            'catalog_id'     => (int) $t->id,
+            'title'          => $t->label(),
+        ]);
+    }
+
     /** Freie Leistung (Freitext, ohne Katalog/Verfahren) am Termin erfassen. */
     public function addFreeService(): void
     {
@@ -671,6 +709,22 @@ class Show extends Component
             $practiceServiceOptions[] = ['value' => (int) $ps->id, 'label' => $ps->title];
         }
 
+        // Weitere steckbare Leistungs-Kataloge (guarded — Module optional).
+        $vaccinationOptions = [];
+        if (class_exists(\Platform\Vaccinations\Models\Vaccination::class)) {
+            foreach (\Platform\Vaccinations\Models\Vaccination::query()->forTeam($team)->active()
+                        ->orderBy('position')->orderBy('name')->get() as $v) {
+                $vaccinationOptions[] = ['value' => (int) $v->id, 'label' => $v->label()];
+            }
+        }
+        $labTestOptions = [];
+        if (class_exists(\Platform\Laboratory\Models\LabTest::class)) {
+            foreach (\Platform\Laboratory\Models\LabTest::query()->forTeam($team)->active()
+                        ->orderBy('position')->orderBy('name')->get() as $t) {
+                $labTestOptions[] = ['value' => (int) $t->id, 'label' => $t->label()];
+            }
+        }
+
         // Art der Vorsorge (Screenshot) — Labels wie im Bestand.
         $careTypeOptions = [
             'mandatory' => 'Pflichtvorsorge',
@@ -696,6 +750,8 @@ class Show extends Component
             'selectedExaminations'     => $selectedExaminations,
             'examinationPickerOptions' => $examinationPickerOptions,
             'practiceServiceOptions'   => $practiceServiceOptions,
+            'vaccinationOptions'       => $vaccinationOptions,
+            'labTestOptions'           => $labTestOptions,
             'careTypeOptions'          => $careTypeOptions,
             'anamnesisQuestions'  => $this->relevantQuestions($team),
             'bundleOptions'       => collect($this->bundleOptions($team))
